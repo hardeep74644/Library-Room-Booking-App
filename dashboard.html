@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Room Booking - Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="nav-container">
+                <h1 class="logo">Library Room Booking</h1>
+                <ul class="nav-links">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="dashboard.html">Dashboard</a></li>
+                    <li><a href="#" id="logout-btn">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main class="dashboard">
+        <div class="container">
+            <h2>Dashboard</h2>
+            
+            <section class="user-info">
+                <h3>Welcome, <span id="user-name">User</span>!</h3>
+                <p>Email: <span id="user-email"></span></p>
+            </section>
+
+            <section class="bookings">
+                <h3>Available Rooms</h3>
+                <div id="rooms-list" class="rooms-grid">
+                    <!-- Rooms will be loaded dynamically -->
+                </div>
+            </section>
+
+            <section class="my-bookings">
+                <h3>My Bookings</h3>
+                <div id="bookings-list">
+                    <!-- Bookings will be loaded dynamically -->
+                </div>
+            </section>
+
+            <section class="admin-panel" id="admin-panel" style="display: none;">
+                <h3>Admin Panel</h3>
+                <div class="admin-controls">
+                    <button id="add-room-btn" class="btn-primary">Add Room</button>
+                    <button id="manage-users-btn" class="btn-secondary">Manage Users</button>
+                </div>
+                <div id="admin-content">
+                    <!-- Admin content will be loaded dynamically -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Library Room Booking System. All rights reserved.</p>
+    </footer>
+
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/admin.js"></script>
+</body>
+</html>
