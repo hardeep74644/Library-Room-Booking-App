@@ -2,67 +2,102 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>Library Room Booking Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Library Room Booking - Dashboard</title>
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f6f8;
+        }
+        header {
+            background: #2d3e50;
+            color: #fff;
+            padding: 1rem 2rem;
+            text-align: center;
+        }
+        main {
+            max-width: 900px;
+            margin: 2rem auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 2rem;
+        }
+        h2 {
+            color: #2d3e50;
+        }
+        .actions {
+            margin-bottom: 2rem;
+        }
+        .actions button {
+            background: #4caf50;
+            color: #fff;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: left;
+        }
+        th {
+            background: #f0f2f5;
+        }
+        @media (max-width: 600px) {
+            main {
+                padding: 1rem;
+            }
+            th, td {
+                padding: 0.5rem;
+            }
+        }
+    </style>
 </head>
 <body>
     <header>
-        <nav>
-            <div class="nav-container">
-                <h1 class="logo">Library Room Booking</h1>
-                <ul class="nav-links">
-                    <li><a href="index.html">Home</a></li>
-                    <li><a href="dashboard.html">Dashboard</a></li>
-                    <li><a href="#" id="logout-btn">Logout</a></li>
-                </ul>
-            </div>
-        </nav>
+        <h1>Library Room Booking Dashboard</h1>
     </header>
-
-    <main class="dashboard">
-        <div class="container">
-            <h2>Dashboard</h2>
-            
-            <section class="user-info">
-                <h3>Welcome, <span id="user-name">User</span>!</h3>
-                <p>Email: <span id="user-email"></span></p>
-            </section>
-
-            <section class="bookings">
-                <h3>Available Rooms</h3>
-                <div id="rooms-list" class="rooms-grid">
-                    <!-- Rooms will be loaded dynamically -->
-                </div>
-            </section>
-
-            <section class="my-bookings">
-                <h3>My Bookings</h3>
-                <div id="bookings-list">
-                    <!-- Bookings will be loaded dynamically -->
-                </div>
-            </section>
-
-            <section class="admin-panel" id="admin-panel" style="display: none;">
-                <h3>Admin Panel</h3>
-                <div class="admin-controls">
-                    <button id="add-room-btn" class="btn-primary">Add Room</button>
-                    <button id="manage-users-btn" class="btn-secondary">Manage Users</button>
-                </div>
-                <div id="admin-content">
-                    <!-- Admin content will be loaded dynamically -->
-                </div>
-            </section>
-        </div>
+    <main>
+        <section class="actions">
+            <button onclick="alert('Feature coming soon!')">Book a Room</button>
+        </section>
+        <section>
+            <h2>Your Bookings</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Room</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Booking rows will go here -->
+                    <tr>
+                        <td>Room 101</td>
+                        <td>2024-06-15</td>
+                        <td>10:00 - 12:00</td>
+                        <td>Confirmed</td>
+                    </tr>
+                    <tr>
+                        <td>Room 202</td>
+                        <td>2024-06-18</td>
+                        <td>14:00 - 16:00</td>
+                        <td>Pending</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
     </main>
-
-    <footer>
-        <p>&copy; 2024 Library Room Booking System. All rights reserved.</p>
-    </footer>
-
-    <script type="module" src="js/firebase-config.js"></script>
-    <script type="module" src="js/auth.js"></script>
-    <script type="module" src="js/main.js"></script>
-    <script type="module" src="js/admin.js"></script>
 </body>
 </html>
