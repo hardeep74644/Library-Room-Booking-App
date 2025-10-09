@@ -175,4 +175,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ Auth module loaded');
+console.log('✅ Auth module loaded'); 
