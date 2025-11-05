@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Librarian Dashboard - KPU Library</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body style="background: #f5f7fa;">
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>📚 Librarian Dashboard</h1>
+                    <p class="user-info">Welcome, <strong>Librarian Name</strong></p>
+                </div>
+                <button onclick="logout()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer;">Logout</button>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="card">
+            <div style="display: flex; gap: 15px; border-bottom: 2px solid #e0e0e0; margin-bottom: 20px;">
+                <button class="tab-btn active" onclick="showTab('rooms')">🏢 Manage Rooms</button>
+                <button class="tab-btn" onclick="showTab('reservations')">📋 Manage Reservations</button>
+                <button class="tab-btn" onclick="showTab('students')">👥 Manage Students</button>
+            </div>
+
+            <!-- Rooms Tab -->
+            <div id="rooms-tab" class="tab-content active">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Room Management</h2>
+                    <button class="btn-success" onclick="showAddRoomModal()">+ Add New Room</button>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Room Number</th>
+                            <th>Floor</th>
+                            <th>Capacity</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rooms-table">
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: #999;">Loading rooms...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Reservations Tab -->
+            <div id="reservations-tab" class="tab-content">
+                <h2>Reservation Management</h2>
+                
+                <div style="margin-bottom: 20px;">
+                    <label>Filter by status:</label>
+                    <select id="reservation-filter" onchange="loadReservations()" style="margin-left: 10px; padding: 8px;">
+                        <option value="all">All Reservations</option>
+                        <option value="active">Active Only</option>
+                        <option value="cancelled">Cancelled Only</option>
+                    </select>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Room</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reservations-table">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #999;">Loading reservations...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Students Tab -->
+            <div id="students-tab" class="tab-content">
+                <h2>Student Management</h2>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Joined Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="students-table">
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: #999;">Loading students...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Room Modal -->
+    <div id="add-room-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddRoomModal()">&times;</span>
+            <h2>Add New Room</h2>
+            <form id="add-room-form">
+                <div class="form-group">
+                    <label for="room-number">Room Number</label>
+                    <input type="text" id="room-number" required placeholder="e.g., R101">
+                </div>
+                <div class="form-group">
+                    <label for="room-floor">Floor</label>
+                    <input type="number" id="room-floor" required min="1" placeholder="e.g., 1">
+                </div>
+                <div class="form-group">
+                    <label for="room-capacity">Capacity</label>
+                    <select id="room-capacity" required>
+                        <option value="2">2 People</option>
+                        <option value="4">4 People</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn-success">Add Room</button>
+                    <button type="button" class="btn-secondary" onclick="closeAddRoomModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+    </style>
+
+    <script type="module" src="js/admin-dashboard.js"></script>
+</body>
+</html>
