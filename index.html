@@ -2,55 +2,91 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Library Room Booking App - In Progress</title>
+    <title>Library Room Booking App</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6fa;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            background: #fff;
-            padding: 2rem 3rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            text-align: center;
-        }
-        h1 {
-            color: #2d3e50;
-            margin-bottom: 1rem;
-        }
-        p {
-            color: #6c7a89;
-            font-size: 1.1rem;
-        }
-        .loader {
-            margin: 2rem auto 0;
-            border: 6px solid #f3f3f3;
-            border-top: 6px solid #3498db;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg);}
-            100% { transform: rotate(360deg);}
-        }
-    </style>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Library Room Booking App</h1>
-        <p>This page is currently under development.<br>
-        Please check back soon!</p>
-        <div class="loader"></div>
-    </div>
+    <header>
+        <nav>
+            <div class="nav-container">
+                <h1 class="logo">📚 Library Room Booking</h1>
+                <ul class="nav-links">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="register.html">Register</a></li>
+                    <li><a href="login.html">Login</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <h2>Welcome to Library Room Booking System</h2>
+                <p>Book study rooms and meeting spaces with ease</p>
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                    <a href="register.html" class="btn-primary">Get Started</a>
+                    <a href="login.html" class="btn-secondary">Login</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <h3>Features</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>🔐 Secure Authentication</h4>
+                        <p>Separate portals for students and librarians with role-based access</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📅 Easy Booking</h4>
+                        <p>Search and filter rooms by date, time, and capacity (2 or 4 people)</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⏰ Real-time Availability</h4>
+                        <p>Check room availability in real-time with visual time slot interface</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🚫 Conflict Prevention</h4>
+                        <p>Automatic detection and prevention of overlapping bookings</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>👥 User Management</h4>
+                        <p>Librarians can manage students, rooms, and reservations</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📊 Booking History</h4>
+                        <p>View and manage your active bookings with easy cancellation</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" style="background: #f8f9fa;">
+            <div class="container">
+                <h3>How It Works</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>1️⃣ Register</h4>
+                        <p>Create an account as a student or librarian</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>2️⃣ Search Rooms</h4>
+                        <p>Filter by date, time, and capacity to find available rooms</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>3️⃣ Book & Confirm</h4>
+                        <p>Select your preferred room and time slot, then confirm your booking</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Library Room Booking System. All rights reserved.</p>
+    </footer>
 </body>
 </html>
