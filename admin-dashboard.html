@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Librarian Dashboard - KPU Library</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body style="background: #f5f7fa;">
     <div class="dashboard">
         <!-- Header -->
@@ -15,7 +17,8 @@
                     <h1>📚 Librarian Dashboard</h1>
                     <p class="user-info">Welcome, <strong>Librarian Name</strong></p>
                 </div>
-                <button onclick="logout()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer;">Logout</button>
+                <button onclick="logout()"
+                    style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer;">Logout</button>
             </div>
         </div>
 
@@ -24,29 +27,35 @@
             <div style="display: flex; gap: 15px; border-bottom: 2px solid #e0e0e0; margin-bottom: 20px;">
                 <button class="tab-btn active" onclick="showTab('rooms')">🏢 Manage Rooms</button>
                 <button class="tab-btn" onclick="showTab('reservations')">📋 Manage Reservations</button>
-                <button class="tab-btn" onclick="showTab('students')">👥 Manage Students</button>
+                <button class="tab-btn" onclick="showTab('students')">👥 Manage Users</button>
             </div>
 
             <!-- Rooms Tab -->
             <div id="rooms-tab" class="tab-content active">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>Room Management</h2>
-                    <button class="btn-success" onclick="showAddRoomModal()">+ Add New Room</button>
+                    <div>
+                        <button class="btn-secondary" onclick="testAdminDashboard()" style="margin-right: 10px;">Test
+                            Functions</button>
+                        <button class="btn-success" onclick="showAddRoomModal()">+ Add New Room</button>
+                    </div>
                 </div>
-                
+
                 <table>
                     <thead>
                         <tr>
                             <th>Room Number</th>
                             <th>Floor</th>
                             <th>Capacity</th>
+                            <th>Available Days</th>
+                            <th>Available Hours</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="rooms-table">
                         <tr>
-                            <td colspan="5" style="text-align: center; color: #999;">Loading rooms...</td>
+                            <td colspan="7" style="text-align: center; color: #999;">Loading rooms...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -55,16 +64,17 @@
             <!-- Reservations Tab -->
             <div id="reservations-tab" class="tab-content">
                 <h2>Reservation Management</h2>
-                
+
                 <div style="margin-bottom: 20px;">
                     <label>Filter by status:</label>
-                    <select id="reservation-filter" onchange="loadReservations()" style="margin-left: 10px; padding: 8px;">
+                    <select id="reservation-filter" onchange="loadReservations()"
+                        style="margin-left: 10px; padding: 8px;">
                         <option value="all">All Reservations</option>
                         <option value="active">Active Only</option>
                         <option value="cancelled">Cancelled Only</option>
                     </select>
                 </div>
-                
+
                 <table>
                     <thead>
                         <tr>
@@ -86,8 +96,16 @@
 
             <!-- Students Tab -->
             <div id="students-tab" class="tab-content">
-                <h2>Student Management</h2>
-                
+                <h2>User Management</h2>
+
+                <div
+                    style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 5px;">
+                    <p style="margin: 0; color: #856404;">
+                        <strong>⚠️ Warning:</strong> Deleting a user will permanently remove their account and all
+                        associated bookings. This action cannot be undone.
+                    </p>
+                </div>
+
                 <table>
                     <thead>
                         <tr>
@@ -100,7 +118,7 @@
                     </thead>
                     <tbody id="students-table">
                         <tr>
-                            <td colspan="5" style="text-align: center; color: #999;">Loading students...</td>
+                            <td colspan="5" style="text-align: center; color: #999;">Loading users...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -132,6 +150,61 @@
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
                     <button type="submit" class="btn-success">Add Room</button>
                     <button type="button" class="btn-secondary" onclick="closeAddRoomModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Room Schedule Modal -->
+    <div id="room-schedule-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" onclick="closeRoomScheduleModal()">&times;</span>
+            <h2>Set Room Availability Schedule</h2>
+            <p><strong>Room:</strong> <span id="schedule-room-name"></span></p>
+
+            <form id="room-schedule-form">
+                <div class="form-group">
+                    <label>Available Days of Week</label>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="days" value="monday"> Monday
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="days" value="tuesday"> Tuesday
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="days" value="wednesday"> Wednesday
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="days" value="thursday"> Thursday
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="days" value="friday"> Friday
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="days" value="saturday"> Saturday
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" name="days" value="sunday"> Sunday
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="schedule-start-time">Available From</label>
+                    <input type="time" id="schedule-start-time" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="schedule-end-time">Available Until</label>
+                    <input type="time" id="schedule-end-time" required>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn-success">Save Schedule</button>
+                    <button type="button" class="btn-secondary" onclick="closeRoomScheduleModal()">Cancel</button>
+                    <button type="button" class="btn-danger" onclick="clearRoomSchedule()"
+                        style="margin-left: auto;">Clear Schedule</button>
                 </div>
             </form>
         </div>
@@ -175,7 +248,7 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: rgba(0, 0, 0, 0.5);
         }
 
         .modal-content {
@@ -185,7 +258,7 @@
             border-radius: 10px;
             width: 90%;
             max-width: 500px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
         .close {
@@ -203,4 +276,5 @@
 
     <script type="module" src="js/admin-dashboard.js"></script>
 </body>
+
 </html>

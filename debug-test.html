@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Test - Library Room Booking</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-result {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Debug Test - Library Room Booking System</h1>
+
+        <h2>System Diagnostics</h2>
+        <div id="diagnostics"></div>
+
+        <h2>Quick Tests</h2>
+        <button onclick="testFirebaseConnection()">Test Firebase Connection</button>
+        <button onclick="testAuth()">Test Authentication</button>
+        <button onclick="testDatabase()">Test Database</button>
+        <button onclick="testFirebaseRules()">Test Firebase Rules</button>
+        <button onclick="testRoomSchedules()">Test Room Schedules</button>
+        <button onclick="initializeSampleData()">Initialize Sample Data</button>
+
+        <div id="test-results"></div>
+
+        <h2>Console Logs</h2>
+        <pre id="console-logs"></pre>
+    </div>
+
+    <script type="module">
+        import { auth, db } from './js/firebase-config.js';
+        import {
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged
+        } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import {
+            collection,
+            addDoc,
+            getDocs,
+            doc,
+            setDoc,
+            Timestamp,
+            query,
+            where
+        } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        // Capture console logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        let logs = [];
+
+        console.log = function (...args) {
+            logs.push(`[LOG] ${new Date().toLocaleTimeString()}: ${args.join(' ')}`);
+            updateConsoleLogs();
+            originalLog.apply(console, arguments);
+        };
+
+        console.error = function (...args) {
+            logs.push(`[ERROR] ${new Date().toLocaleTimeString()}: ${args.join(' ')}`);
+            updateConsoleLogs();
+            originalError.apply(console, arguments);
+        };
+
+        function updateConsoleLogs() {
+            const consoleDiv = document.getElementById('console-logs');
+            consoleDiv.textContent = logs.slice(-20).join('\n');
+        }
+
+        function addResult(message, isSuccess = true) {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${isSuccess ? 'success' : 'error'}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        // Run initial diagnostics
+        window.addEventListener('load', () => {
+            runDiagnostics();
+        });
+
+        function runDiagnostics() {
+            const diagnosticsDiv = document.getElementById('diagnostics');
+            const checks = [];
+
+            // Check if running on localhost or HTTPS
+            if (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+                checks.push('✅ Running on secure context (HTTPS/localhost)');
+            } else {
+                checks.push('❌ Not running on secure context - Firebase requires HTTPS or localhost');
+            }
+
+            // Check Firebase modules
+            try {
+                if (auth) checks.push('✅ Firebase Auth module loaded');
+                if (db) checks.push('✅ Firebase Firestore module loaded');
+            } catch (error) {
+                checks.push(`❌ Firebase modules error: ${error.message}`);
+            }
+
+            diagnosticsDiv.innerHTML = checks.map(check => `<div class="test-result ${check.includes('✅') ? 'success' : 'error'}">${check}</div>`).join('');
+        }
+
+        window.testFirebaseConnection = async function () {
+            try {
+                console.log('Testing Firebase connection...');
+
+                // Test Firestore connection
+                const testCollection = collection(db, 'test');
+                const snapshot = await getDocs(testCollection);
+
+                addResult('✅ Firebase connection successful');
+                console.log('Firebase connection test passed');
+            } catch (error) {
+                addResult(`❌ Firebase connection failed: ${error.message}`, false);
+                console.error('Firebase connection test failed:', error);
+            }
+        };
+
+        window.testAuth = async function () {
+            try {
+                console.log('Testing authentication...');
+
+                // Test auth state listener
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        console.log('User is signed in:', user.email);
+                    } else {
+                        console.log('No user signed in');
+                    }
+                });
+
+                addResult('✅ Authentication module working');
+                console.log('Authentication test passed');
+            } catch (error) {
+                addResult(`❌ Authentication test failed: ${error.message}`, false);
+                console.error('Authentication test failed:', error);
+            }
+        };
+
+        window.testDatabase = async function () {
+            try {
+                console.log('Testing database operations...');
+
+                // Test reading collections
+                const roomsSnapshot = await getDocs(collection(db, 'rooms'));
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const bookingsSnapshot = await getDocs(collection(db, 'bookings'));
+
+                addResult(`✅ Database access successful - Rooms: ${roomsSnapshot.size}, Users: ${usersSnapshot.size}, Bookings: ${bookingsSnapshot.size}`);
+                console.log('Database test passed');
+            } catch (error) {
+                addResult(`❌ Database test failed: ${error.message}`, false);
+                console.error('Database test failed:', error);
+            }
+        };
+
+        window.initializeSampleData = async function () {
+            try {
+                console.log('Initializing sample data...');
+
+                // Add sample rooms
+                const sampleRooms = [
+                    { number: 'R101', floor: 1, capacity: 2 },
+                    { number: 'R102', floor: 1, capacity: 4 },
+                    { number: 'R201', floor: 2, capacity: 2 },
+                    { number: 'R202', floor: 2, capacity: 4 },
+                    { number: 'R301', floor: 3, capacity: 2 },
+                    { number: 'R302', floor: 3, capacity: 4 }
+                ];
+
+                let addedRooms = 0;
+                for (const room of sampleRooms) {
+                    // Check if room already exists
+                    const roomsRef = collection(db, 'rooms');
+                    const q = query(roomsRef, where('number', '==', room.number));
+                    const snapshot = await getDocs(q);
+
+                    if (snapshot.empty) {
+                        await addDoc(collection(db, 'rooms'), {
+                            ...room,
+                            createdAt: Timestamp.now()
+                        });
+                        addedRooms++;
+                    }
+                }
+
+                addResult(`✅ Sample data initialized - Added ${addedRooms} rooms`);
+                console.log('Sample data initialization completed');
+            } catch (error) {
+                addResult(`❌ Sample data initialization failed: ${error.message}`, false);
+                console.error('Sample data initialization failed:', error);
+            }
+        };
+
+        window.testFirebaseRules = async function () {
+            try {
+                console.log('Testing Firebase security rules...');
+
+                // Test if we can read users collection
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                addResult(`✅ Can read users collection - Found ${usersSnapshot.size} users`);
+
+                // Test if we can read rooms collection
+                const roomsSnapshot = await getDocs(collection(db, 'rooms'));
+                addResult(`✅ Can read rooms collection - Found ${roomsSnapshot.size} rooms`);
+
+                // Test if we can read bookings collection
+                const bookingsSnapshot = await getDocs(collection(db, 'bookings'));
+                addResult(`✅ Can read bookings collection - Found ${bookingsSnapshot.size} bookings`);
+
+                console.log('Firebase rules test completed');
+            } catch (error) {
+                addResult(`❌ Firebase rules test failed: ${error.message}`, false);
+                console.error('Firebase rules test failed:', error);
+            }
+        };
+
+        window.testRoomSchedules = async function () {
+            try {
+                console.log('Testing room schedules...');
+
+                const roomsSnapshot = await getDocs(collection(db, 'rooms'));
+
+                if (roomsSnapshot.empty) {
+                    addResult('❌ No rooms found in database. Run "Initialize Sample Data" first.', false);
+                    return;
+                }
+
+                addResult(`✅ Found ${roomsSnapshot.size} rooms in database`);
+
+                roomsSnapshot.forEach(doc => {
+                    const room = doc.data();
+                    const schedule = room.schedule;
+
+                    if (schedule) {
+                        addResult(`✅ Room ${room.number}: Has schedule - Days: ${schedule.days?.join(', ') || 'None'}, Time: ${schedule.startTime || 'None'} - ${schedule.endTime || 'None'}`);
+                    } else {
+                        addResult(`⚠️ Room ${room.number}: No schedule set`);
+                    }
+                });
+
+                console.log('Room schedules test completed');
+            } catch (error) {
+                addResult(`❌ Room schedules test failed: ${error.message}`, false);
+                console.error('Room schedules test failed:', error);
+            }
+        };
+
+        // Test automatic login detection
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                addResult(`✅ User detected: ${user.email}`);
+            } else {
+                addResult('ℹ️ No user currently signed in');
+            }
+        });
+
+        console.log('Debug test page loaded');
+    </script>
+</body>
+
+</html>

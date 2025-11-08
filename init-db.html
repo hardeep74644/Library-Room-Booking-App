@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,15 +13,18 @@
             padding: 20px;
             background: #f5f7fa;
         }
+
         .container {
             background: white;
             padding: 30px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             color: #2c3e50;
         }
+
         button {
             padding: 12px 24px;
             background: #3498db;
@@ -31,9 +35,11 @@
             font-size: 1rem;
             margin: 10px 5px;
         }
+
         button:hover {
             background: #2980b9;
         }
+
         .success {
             background: #28a745;
             color: white;
@@ -42,6 +48,7 @@
             margin: 10px 0;
             display: none;
         }
+
         .error {
             background: #dc3545;
             color: white;
@@ -50,12 +57,14 @@
             margin: 10px 0;
             display: none;
         }
+
         .info {
             background: #e9ecef;
             padding: 20px;
             border-radius: 5px;
             margin: 20px 0;
         }
+
         pre {
             background: #f8f9fa;
             padding: 15px;
@@ -64,10 +73,11 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Library Room Booking - Database Initialization</h1>
-        
+
         <div class="info">
             <h3>What this does:</h3>
             <p>This page will initialize your Firestore database with sample rooms. Click the button below to:</p>
@@ -98,7 +108,8 @@ Librarian Account:
   Password: librarian123
   Role: Librarian
             </pre>
-            <p><strong>Note:</strong> You need to create these accounts manually via the <a href="register.html">registration page</a>.</p>
+            <p><strong>Note:</strong> You need to create these accounts manually via the <a
+                    href="register.html">registration page</a>.</p>
         </div>
     </div>
 
@@ -106,20 +117,74 @@ Librarian Account:
         import { db } from './js/firebase-config.js';
         import { collection, addDoc, getDocs, query, where, Timestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-        window.initializeRooms = async function() {
+        window.initializeRooms = async function () {
             const successDiv = document.getElementById('success');
             const errorDiv = document.getElementById('error');
-            
+
             successDiv.style.display = 'none';
             errorDiv.style.display = 'none';
 
             const sampleRooms = [
-                { number: 'R101', floor: 1, capacity: 2 },
-                { number: 'R102', floor: 1, capacity: 4 },
-                { number: 'R201', floor: 2, capacity: 2 },
-                { number: 'R202', floor: 2, capacity: 4 },
-                { number: 'R301', floor: 3, capacity: 2 },
-                { number: 'R302', floor: 3, capacity: 4 }
+                {
+                    number: 'R101',
+                    floor: 1,
+                    capacity: 2,
+                    schedule: {
+                        days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+                        startTime: '09:00',
+                        endTime: '17:00'
+                    }
+                },
+                {
+                    number: 'R102',
+                    floor: 1,
+                    capacity: 4,
+                    schedule: {
+                        days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+                        startTime: '08:00',
+                        endTime: '18:00'
+                    }
+                },
+                {
+                    number: 'R201',
+                    floor: 2,
+                    capacity: 2,
+                    schedule: {
+                        days: ['monday', 'wednesday', 'friday'],
+                        startTime: '10:00',
+                        endTime: '16:00'
+                    }
+                },
+                {
+                    number: 'R202',
+                    floor: 2,
+                    capacity: 4,
+                    schedule: {
+                        days: ['tuesday', 'thursday', 'saturday'],
+                        startTime: '09:00',
+                        endTime: '15:00'
+                    }
+                },
+                {
+                    number: 'R301',
+                    floor: 3,
+                    capacity: 2,
+                    schedule: {
+                        days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+                        startTime: '11:00',
+                        endTime: '19:00'
+                    }
+                },
+                {
+                    number: 'R302',
+                    floor: 3,
+                    capacity: 4,
+                    schedule: {
+                        days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                        startTime: '08:00',
+                        endTime: '20:00'
+                    }
+                }
             ];
 
             try {
@@ -133,11 +198,12 @@ Librarian Account:
                     const snapshot = await getDocs(q);
 
                     if (snapshot.empty) {
-                        // Add room
+                        // Add room with schedule
                         await addDoc(collection(db, 'rooms'), {
                             number: room.number,
                             floor: room.floor,
                             capacity: room.capacity,
+                            schedule: room.schedule,
                             createdAt: Timestamp.now()
                         });
                         addedCount++;
@@ -146,7 +212,7 @@ Librarian Account:
                     }
                 }
 
-                successDiv.textContent = `✅ Database initialized! Added ${addedCount} rooms. Skipped ${skippedCount} existing rooms.`;
+                successDiv.textContent = `✅ Database initialized! Added ${addedCount} rooms with schedules. Skipped ${skippedCount} existing rooms.`;
                 successDiv.style.display = 'block';
             } catch (error) {
                 console.error('Error initializing database:', error);
@@ -156,4 +222,5 @@ Librarian Account:
         };
     </script>
 </body>
+
 </html>

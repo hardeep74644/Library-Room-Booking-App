@@ -27,8 +27,8 @@ service cloud.firestore {
       // Only allow creating user document during registration
       allow create: if isSignedIn() && request.auth.uid == userId;
       
-      // Librarians can read all users and update roles
-      allow read, update: if isLibrarian();
+      // Librarians can read all users, update roles, and delete users
+      allow read, update, delete: if isLibrarian();
     }
     
     // Rooms collection

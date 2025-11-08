@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Library Room Booking - Register</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
     <div class="login-container">
         <div class="login-box">
@@ -47,26 +49,37 @@
 
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const name = document.getElementById('name').value.trim();
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const role = document.getElementById('role').value;
             const submitBtn = registerForm.querySelector('button[type="submit"]');
-            
+
+            // Basic validation
+            if (!name || !email || !password || !role) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            if (password.length < 6) {
+                alert('Password must be at least 6 characters long');
+                return;
+            }
+
             submitBtn.disabled = true;
             submitBtn.textContent = 'Creating account...';
-            
+
             try {
                 // Create user account
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
-                
+
                 // Update profile with name
                 await updateProfile(user, {
                     displayName: name
                 });
-                
+
                 // Save user data to Firestore
                 await setDoc(doc(db, 'users', user.uid), {
                     name: name,
@@ -74,20 +87,23 @@
                     role: role,
                     createdAt: new Date().toISOString()
                 });
-                
+
                 alert('Registration successful! Redirecting...');
-                
+
                 // Redirect based on role
-                if (role === 'librarian') {
-                    window.location.href = 'admin-dashboard.html';
-                } else {
-                    window.location.href = 'dashboardStudent.html';
-                }
+                setTimeout(() => {
+                    if (role === 'librarian') {
+                        window.location.href = 'admin-dashboard.html';
+                    } else {
+                        window.location.href = 'dashboardStudent.html';
+                    }
+                }, 1000);
+
             } catch (error) {
                 console.error('Registration error:', error);
                 let errorMessage = 'Registration failed. Please try again.';
-                
-                switch(error.code) {
+
+                switch (error.code) {
                     case 'auth/email-already-in-use':
                         errorMessage = 'An account with this email already exists.';
                         break;
@@ -97,8 +113,11 @@
                     case 'auth/weak-password':
                         errorMessage = 'Password should be at least 6 characters.';
                         break;
+                    case 'auth/network-request-failed':
+                        errorMessage = 'Network error. Please check your internet connection.';
+                        break;
                 }
-                
+
                 alert(errorMessage);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Register';
@@ -106,4 +125,5 @@
         });
     </script>
 </body>
+
 </html>

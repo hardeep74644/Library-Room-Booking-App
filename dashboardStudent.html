@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard - KPU Library</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body style="background: #f5f7fa;">
     <div class="dashboard">
         <!-- Header -->
@@ -13,21 +15,24 @@
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h1>📚 Student Dashboard</h1>
-                    <p class="user-info">Welcome, <strong>Student Name</strong> (ID: 100123456)</p>
+                    <p class="user-info">Welcome, <strong>Student Name</strong></p>
                 </div>
-                <button onclick="logout()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer;">Logout</button>
+                <button onclick="logout()"
+                    style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer;">Logout</button>
             </div>
         </div>
 
         <!-- Booking Status Alert -->
-        <div id="booking-alert" class="card" style="background: #fff3cd; border-left: 4px solid #ffc107; display: none;">
-            <p style="margin: 0; color: #856404;">⚠️ You have an active booking today. You cannot make another booking within 24 hours.</p>
+        <div id="booking-alert" class="card"
+            style="background: #fff3cd; border-left: 4px solid #ffc107; display: none;">
+            <p style="margin: 0; color: #856404;">⚠️ You have an active booking today. You cannot make another booking
+                within 24 hours.</p>
         </div>
 
         <!-- Book a Room Section -->
         <div class="card">
             <h2>📅 Book a Room</h2>
-            
+
             <!-- Room Capacity Selection -->
             <div class="form-group">
                 <label>Select Room Capacity</label>
@@ -140,4 +145,5 @@
 
     <script type="module" src="js/student-dashboard.js"></script>
 </body>
+
 </html>

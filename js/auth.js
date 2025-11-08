@@ -1,8 +1,8 @@
 // Authentication functionality
 // Authentication functionality
 import { auth, db } from './firebase-config.js';
-import { 
-    signInWithEmailAndPassword, 
+import {
+    signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
@@ -12,36 +12,43 @@ import { doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/f
 
 // Check authentication state
 export function checkAuthState() {
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            console.log('✅ User is signed in:', user.email);
-            
-            // Get user role from Firestore
-            try {
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
-                const userData = userDoc.data();
-                
-                // Redirect if on login page
-                if (window.location.pathname.includes('login.html')) {
-                    if (userData && userData.role === 'librarian') {
-                        window.location.href = 'admin-dashboard.html';
-                    } else {
-                        window.location.href = 'dashboardStudent.html';
+    return new Promise((resolve) => {
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                console.log('✅ User is signed in:', user.email);
+
+                // Get user role from Firestore
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    const userData = userDoc.data();
+
+                    // Only redirect if on login page
+                    if (window.location.pathname.includes('login.html')) {
+                        if (userData && userData.role === 'librarian') {
+                            window.location.href = 'admin-dashboard.html';
+                        } else {
+                            window.location.href = 'dashboardStudent.html';
+                        }
                     }
+
+                    resolve({ user, userData });
+                } catch (error) {
+                    console.error('Error getting user data:', error);
+                    resolve({ user, userData: null });
                 }
-            } catch (error) {
-                console.error('Error getting user data:', error);
+            } else {
+                console.log('❌ No user signed in');
+                // Only redirect to login if on protected page
+                const protectedPages = ['dashboardStudent.html', 'admin-dashboard.html'];
+                const currentPage = window.location.pathname.split('/').pop();
+
+                if (protectedPages.includes(currentPage)) {
+                    window.location.href = 'login.html';
+                }
+
+                resolve({ user: null, userData: null });
             }
-        } else {
-            console.log('❌ No user signed in');
-            // Redirect to login if on protected page
-            const protectedPages = ['dashboardStudent.html', 'admin-dashboard.html'];
-            const currentPage = window.location.pathname.split('/').pop();
-            
-            if (protectedPages.includes(currentPage)) {
-                window.location.href = 'login.html';
-            }
-        }
+        });
     });
 }
 
@@ -50,11 +57,11 @@ export async function login(email, password) {
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        
+
         // Get user role
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         const userData = userDoc.data();
-        
+
         console.log('✅ Login successful:', user.email);
         return { user, role: userData?.role || 'student' };
     } catch (error) {
@@ -69,12 +76,12 @@ export async function register(email, password, name, role = 'student') {
         // Create user account
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        
+
         // Update profile with name
         await updateProfile(user, {
             displayName: name
         });
-        
+
         // Save user data to Firestore
         await setDoc(doc(db, 'users', user.uid), {
             name: name,
@@ -82,7 +89,7 @@ export async function register(email, password, name, role = 'student') {
             role: role,
             createdAt: new Date().toISOString()
         });
-        
+
         console.log('✅ Registration successful:', user.email);
         return { user, role };
     } catch (error) {
@@ -105,7 +112,7 @@ export async function logout() {
 
 // Get error message
 export function getAuthErrorMessage(errorCode) {
-    switch(errorCode) {
+    switch (errorCode) {
         case 'auth/invalid-email':
             return 'Invalid email address format.';
         case 'auth/user-not-found':
@@ -130,36 +137,44 @@ checkAuthState();
 
 // Login form handler (if on login page)
 if (window.location.pathname.includes('login.html')) {
-    const loginForm = document.getElementById('login-form');
-    
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            const submitBtn = loginForm.querySelector('button[type="submit"]');
-            
-            // Disable button during login
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Logging in...';
-            
-            try {
-                const { user, role } = await login(email, password);
-                
-                // Redirect based on role
-                if (role === 'librarian') {
-                    window.location.href = 'admin-dashboard.html';
-                } else {
-                    window.location.href = 'dashboardStudent.html';
+    document.addEventListener('DOMContentLoaded', () => {
+        const loginForm = document.getElementById('login-form');
+
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const email = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value;
+                const submitBtn = loginForm.querySelector('button[type="submit"]');
+
+                if (!email || !password) {
+                    alert('Please fill in all fields');
+                    return;
                 }
-            } catch (error) {
-                alert(getAuthErrorMessage(error.code));
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Login';
-            }
-        });
-    }
+
+                // Disable button during login
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Logging in...';
+
+                try {
+                    const { user, role } = await login(email, password);
+
+                    // Redirect based on role
+                    if (role === 'librarian') {
+                        window.location.href = 'admin-dashboard.html';
+                    } else {
+                        window.location.href = 'dashboardStudent.html';
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    alert(getAuthErrorMessage(error.code));
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Login';
+                }
+            });
+        }
+    });
 }
 
 // Logout button handler (works on any page)

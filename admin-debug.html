@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard Debug</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div style="padding: 20px;">
+        <h1>Admin Dashboard Debug Test</h1>
+        <div id="test-results"></div>
+
+        <h2>Manual Room Entry Test</h2>
+        <div id="rooms-table-test">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Room Number</th>
+                        <th>Floor</th>
+                        <th>Capacity</th>
+                        <th>Available Days</th>
+                        <th>Available Hours</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Room R101</td>
+                        <td>Floor 1</td>
+                        <td>2 people</td>
+                        <td><span style="font-size: 0.9em;">monday, tuesday, wednesday</span></td>
+                        <td><span style="font-size: 0.9em;">09:00 - 17:00</span></td>
+                        <td><span class="available-badge available">Active</span></td>
+                        <td>
+                            <button class="btn-secondary" onclick="testScheduleButton('test123', 'R101')"
+                                style="margin-right: 5px; font-size: 0.85em;">Schedule</button>
+                            <button class="btn-danger" onclick="alert('Delete clicked')"
+                                style="font-size: 0.85em;">Delete</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Function Tests</h2>
+        <button onclick="testFunctions()">Test Admin Functions</button>
+        <button onclick="testModalDisplay()">Test Modal Display</button>
+
+        <div id="console-output"></div>
+    </div>
+
+    <!-- Test Modal -->
+    <div id="room-schedule-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" onclick="closeTestModal()">&times;</span>
+            <h2>Test Schedule Modal</h2>
+            <p>This is a test modal to check if modals work properly.</p>
+            <button onclick="closeTestModal()">Close</button>
+        </div>
+    </div>
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .available-badge {
+            background: #d4edda;
+            color: #155724;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+    </style>
+
+    <script type="module">
+        import { auth, db } from './js/firebase-config.js';
+        import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        let currentUser = null;
+        let testResults = [];
+
+        function addTestResult(message, success = true) {
+            testResults.push(`${success ? '✅' : '❌'} ${message}`);
+            updateResults();
+        }
+
+        function updateResults() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = testResults.map(result => `<div style="margin: 5px 0;">${result}</div>`).join('');
+        }
+
+        window.testScheduleButton = function (roomId, roomNumber) {
+            addTestResult(`Schedule button clicked for ${roomNumber} (ID: ${roomId})`);
+            testModalDisplay();
+        };
+
+        window.testFunctions = function () {
+            testResults = [];
+            addTestResult('Starting function tests...');
+
+            // Test if Firebase is loaded
+            if (typeof auth !== 'undefined') {
+                addTestResult('Firebase auth loaded');
+            } else {
+                addTestResult('Firebase auth NOT loaded', false);
+            }
+
+            if (typeof db !== 'undefined') {
+                addTestResult('Firebase firestore loaded');
+            } else {
+                addTestResult('Firebase firestore NOT loaded', false);
+            }
+
+            // Test if admin dashboard functions exist
+            if (typeof window.showRoomScheduleModal === 'function') {
+                addTestResult('showRoomScheduleModal function exists');
+            } else {
+                addTestResult('showRoomScheduleModal function NOT found', false);
+            }
+
+            // Test authentication state
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    addTestResult(`User authenticated: ${user.email}`);
+                } else {
+                    addTestResult('No user authenticated', false);
+                }
+            });
+        };
+
+        window.testModalDisplay = function () {
+            const modal = document.getElementById('room-schedule-modal');
+            if (modal) {
+                modal.style.display = 'block';
+                addTestResult('Modal displayed successfully');
+            } else {
+                addTestResult('Modal element not found', false);
+            }
+        };
+
+        window.closeTestModal = function () {
+            const modal = document.getElementById('room-schedule-modal');
+            if (modal) {
+                modal.style.display = 'none';
+                addTestResult('Modal closed successfully');
+            }
+        };
+
+        // Test room loading
+        window.testRoomLoading = async function () {
+            try {
+                const roomsRef = collection(db, 'rooms');
+                const snapshot = await getDocs(roomsRef);
+                addTestResult(`Found ${snapshot.size} rooms in database`);
+
+                snapshot.forEach(doc => {
+                    const room = doc.data();
+                    addTestResult(`Room: ${room.number}, Floor: ${room.floor}, Capacity: ${room.capacity}`);
+                });
+            } catch (error) {
+                addTestResult(`Error loading rooms: ${error.message}`, false);
+            }
+        };
+
+        // Auto-run tests on load
+        setTimeout(() => {
+            testFunctions();
+            setTimeout(testRoomLoading, 2000);
+        }, 1000);
+
+        console.log('Debug test page loaded');
+    </script>
+</body>
+
+</html>
