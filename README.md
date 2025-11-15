@@ -1,6 +1,6 @@
 # Library-Room-Booking-App
 
-A web-based Library Room Booking System for managing study room reservations with role-based access for students and librarians.
+A production-ready web-based Library Room Booking System for managing study room reservations with role-based access for students and librarians.
 
 ## Features
 
@@ -8,6 +8,7 @@ A web-based Library Room Booking System for managing study room reservations wit
 - Secure login and registration system using Firebase Authentication
 - Role-based access control (Student and Librarian roles)
 - Automatic redirection based on user role after login
+- Consistent navigation across all pages
 
 ### Student Features
 - **View Available Rooms**: Browse all study rooms with filtering capabilities
@@ -17,31 +18,37 @@ A web-based Library Room Booking System for managing study room reservations wit
   - Search by room number
 - **Visual Availability**: See real-time room availability
 - **Make Reservations**: Book rooms for specific time slots (30 min, 1 hr, 1.5 hr, or 2 hr)
-- **Booking Management**: View and cancel active bookings
+- **Booking Management**: View active, cancelled, and completed bookings
+- **Booking History**: Track past reservations with status updates
 - **Overlap Prevention**: System automatically prevents overlapping bookings
+- **Time Restrictions**: Booking only available between 9:00 AM - 9:00 PM
 
 ### Librarian Features
 - **Student Management**: 
   - View all registered users
-  - Change user roles (student ↔ librarian)
+  - Change user roles (promote students to librarians)
+  - Delete user accounts (with all associated bookings)
   - Track registration dates
 - **Room Management**:
-  - Add new study rooms
-  - Delete existing rooms
+  - Add new study rooms with scheduling
+  - Set room availability date ranges
+  - Delete existing rooms (only if no active bookings)
   - Set room properties (number, floor, capacity)
 - **Reservation Management**:
-  - View all reservations (active and cancelled)
-  - Filter reservations by status
+  - View all reservations with advanced filtering
+  - Filter by status: active, completed, cancelled
   - Cancel reservations on behalf of students
-- **Room Availability**: System automatically manages availability based on bookings
+  - Manage booking conflicts
+- **Room Scheduling**: Set availability date ranges for rooms (all-day availability)
 
 ### Backend Features
 - **Firebase Firestore Database** with collections for:
-  - `users`: User profiles with roles
-  - `rooms`: Room information (number, floor, capacity)
-  - `bookings`: Reservation records with timestamps
-- **Overlap Detection**: Prevents double-booking of rooms
-- **Data Validation**: Ensures booking rules are enforced
+  - `users`: User profiles with roles and creation timestamps
+  - `rooms`: Room information with availability schedules
+  - `bookings`: Reservation records with status tracking
+- **Advanced Status Management**: Automatic transition from active → completed for expired bookings
+- **Overlap Detection**: Prevents double-booking with real-time conflict checking
+- **Data Validation**: Comprehensive booking rule enforcement
 - **Real-time Updates**: Changes reflect immediately across the system
 
 ## Technology Stack
@@ -55,23 +62,37 @@ A web-based Library Room Booking System for managing study room reservations wit
 
 ```
 Library-Room-Booking-App/
-├── index.html                 # Landing page
-├── login.html                 # Login page
-├── register.html              # Registration page
+├── index.html                 # Landing page with navigation
+├── login.html                 # Login page with navigation
+├── register.html              # Registration page with navigation
 ├── dashboardStudent.html      # Student dashboard
 ├── admin-dashboard.html       # Librarian dashboard
-├── init-db.html              # Database initialization utility
+├── init-db.html              # Database initialization utility (admin use only)
 ├── css/
-│   └── style.css             # Main stylesheet
+│   └── style.css             # Main stylesheet with responsive design
 ├── js/
 │   ├── firebase-config.js    # Firebase configuration
 │   ├── auth.js               # Authentication logic
 │   ├── student-dashboard.js  # Student dashboard functionality
 │   └── admin-dashboard.js    # Librarian dashboard functionality
+├── Documentation/
+│   ├── TROUBLESHOOTING.md    # Deployment troubleshooting guide
+│   └── BOOKING_ISSUES_DIAGNOSIS.md  # Operational support guide
 └── README.md
 ```
 
-## Setup Instructions
+## Production Deployment
+
+This system is production-ready with all debug functionality removed:
+
+### ✅ **Production Features:**
+- Clean, professional user interface
+- No debug buttons or test functions
+- Optimized performance without debug logging
+- Secure role-based access control
+- Consistent navigation across all pages
+
+### 🚀 **Deployment Instructions:**
 
 1. **Clone the repository**
    ```bash
@@ -80,33 +101,49 @@ Library-Room-Booking-App/
    ```
 
 2. **Firebase Setup**
-   - The project is already configured with Firebase
-   - Firebase configuration is in `js/firebase-config.js`
+   - The project is configured with Firebase
+   - Update Firebase configuration in `js/firebase-config.js` for your environment
+   - Deploy Firebase Security Rules from `firestore.rules`
 
-3. **Initialize the Database**
-   - Open `init-db.html` in your browser
+3. **Initialize the Database** (Admin Setup)
+   - Open `init-db.html` in your browser (admin access only)
    - Click "Initialize Sample Rooms" to add sample rooms to the database
-   - This creates 6 rooms (3 with 2-person capacity, 3 with 4-person capacity)
+   - Create initial librarian account manually in Firebase Console
 
-4. **Create User Accounts**
-   - Navigate to `register.html` to create student accounts
-   - Note: Only student accounts can be created through registration
-   - Librarian accounts must be created manually in Firebase Console or through existing admin users
-   - Suggested test accounts:
-     - Student: `student@test.com` / `student123`
-     - Librarian: `librarian@test.com` / `librarian123` (create manually)
+4. **Deploy to Web Server**
+   ```bash
+   # For local testing
+   python -m http.server 8000
+   
+   # For production deployment
+   # Upload all files to your web hosting service
+   # Ensure HTTPS is enabled for Firebase authentication
+   ```
 
-5. **Run the Application**
-   - Open `index.html` in a modern web browser
-   - Or use a local server (recommended):
-     ```bash
-     # Using Python 3
-     python -m http.server 8000
-     
-     # Using Node.js
-     npx http-server
-     ```
-   - Navigate to `http://localhost:8000`
+## Setup Instructions
+
+### Initial Admin Setup
+
+1. **Create Initial Librarian Account:**
+   - Use Firebase Console to manually create the first librarian account
+   - Set the user's role field to 'librarian' in Firestore
+   - Suggested initial account: `admin@yourlibrary.com`
+
+2. **Initialize Sample Data:**
+   - Access `init-db.html` (restrict this file in production)
+   - Add sample rooms or create rooms through the admin dashboard
+
+### For End Users
+
+1. **Student Registration:**
+   - Students can register directly through the registration page
+   - All new registrations automatically create student accounts
+   - No role selection available for security
+
+2. **Librarian Account Creation:**
+   - Only existing librarians can promote students to librarian role
+   - Use "Manage Users" section in admin dashboard
+   - Cannot create librarian accounts through public registration
 
 ## Usage Guide
 
@@ -180,6 +217,7 @@ Library-Room-Booking-App/
 1. **Booking Restrictions**:
    - Students can only have one active booking at a time
    - Cannot book rooms for past dates
+   - Booking only available between 9:00 AM - 9:00 PM
    - Minimum booking duration: 30 minutes
    - Maximum booking duration: 2 hours
 
@@ -187,39 +225,98 @@ Library-Room-Booking-App/
    - Only 2-person and 4-person rooms are supported
    - Room capacity is fixed and cannot be changed after creation
 
-3. **Overlap Prevention**:
+3. **Room Availability**:
+   - Librarians must set date ranges for room availability
+   - Rooms are available all day within the set date range
+   - Specific time slots become unavailable only when booked
+
+4. **Booking Status Management**:
+   - **Active**: Current valid bookings
+   - **Completed**: Automatically set when booking time has passed
+   - **Cancelled**: Manually cancelled by user or librarian
+
+5. **Overlap Prevention**:
    - System checks for time conflicts before allowing bookings
    - Two bookings overlap if their time ranges intersect
+   - Real-time availability checking prevents race conditions
 
-4. **Cancellation**:
-   - Students can cancel their own bookings
+6. **Cancellation & Deletion**:
+   - Students can cancel their own active bookings
    - Librarians can cancel any booking
    - Rooms with active bookings cannot be deleted
+   - User deletion removes user and all associated bookings
+
+## Security Features
+
+### Authentication & Authorization
+- Firebase Authentication with email/password
+- Role-based access control (student/librarian)
+- Automatic role verification on page access
+- No public librarian account creation
+
+### Data Protection
+- Firebase Security Rules enforce data access permissions
+- Users can only access their own booking data
+- Librarians have elevated permissions for management tasks
+- Secure Firebase configuration
+
+### Production Security
+- No debug functions exposed to end users
+- No test interfaces in production environment
+- Database initialization tools restricted to admin access
+- Clean error handling without exposing system details
 
 ## Future Enhancements
 
-- Email notifications for booking confirmations
-- Booking history (past bookings)
-- Advanced filtering options
-- Room amenities and features
+- Email notifications for booking confirmations and reminders
+- Advanced analytics dashboard for librarians
+- Mobile app development
+- Multi-location support for different library branches
+- Integration with library card systems
+- Room amenities and equipment booking
 - Multi-day booking support
-- Recurring bookings
-- Waitlist functionality
-- Mobile responsive improvements
-- Analytics dashboard for librarians
+- Recurring bookings for regular events
+- Waitlist functionality for popular rooms
+- Calendar integration (Google Calendar, Outlook)
+- SMS notifications
+- Barcode/QR code check-in system
 
-## Security Considerations
+## Browser Compatibility
 
-- Firebase Security Rules should be configured to:
-  - Allow users to read their own data
-  - Allow users to create bookings only for themselves
-  - Restrict librarian operations to users with librarian role
-  - Prevent unauthorized data access
+- **Recommended**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+- **Required**: ES6 module support, Firebase SDK compatibility
+- **Mobile**: Responsive design works on tablets and smartphones
+- **HTTPS**: Required for Firebase authentication in production
+
+## Performance Considerations
+
+- **Database Queries**: Optimized with proper indexing
+- **Real-time Updates**: Efficient Firebase listeners
+- **Client-side Validation**: Reduces server load
+- **Responsive Images**: Optimized for different screen sizes
+- **Minimal Dependencies**: Pure JavaScript with Firebase only
+
+## Support & Documentation
+
+- **Troubleshooting**: See `TROUBLESHOOTING.md` for common issues
+- **Booking Issues**: See `BOOKING_ISSUES_DIAGNOSIS.md` for operational problems
+- **Firebase Setup**: Detailed configuration instructions in setup section
+- **Security Rules**: Pre-configured Firestore security rules included
+
+## Version History
+
+- **v1.0** - Initial release with basic booking functionality
+- **v2.0** - Added room scheduling and advanced booking status management
+- **v3.0** - Production-ready release with debug removal and enhanced security
 
 ## License
 
-This project is for educational purposes.
+This project is for educational and library management purposes.
 
 ## Contributors
 
-- Hardeep (hardeep74644)
+- **Hardeep** (hardeep74644) - Lead Developer & Project Maintainer
+
+---
+
+**Note**: This is a production-ready system suitable for deployment in real library environments. All debug and testing functionality has been removed for security and performance optimization.
