@@ -137,66 +137,13 @@ async function loadRooms() {
     }
 }
 
-// Test function to help debug filter issues
-window.testFilterFunction = async function () {
-    console.log('=== Filter Test Started ===');
-
-    const filterSelect = document.getElementById('reservation-filter');
-    if (!filterSelect) {
-        console.error('Filter dropdown not found!');
-        alert('Filter dropdown not found!');
-        return;
-    }
-
-    console.log('Current filter value:', filterSelect.value);
-    console.log('Available options:', Array.from(filterSelect.options).map(opt => opt.value));
-
-    // Test all filter options
-    const testFilters = ['all', 'active', 'cancelled', 'completed'];
-
-    for (const testFilter of testFilters) {
-        console.log(`\n--- Testing filter: ${testFilter} ---`);
-        filterSelect.value = testFilter;
-
-        try {
-            const bookingsRef = collection(db, 'bookings');
-            let q;
-
-            if (testFilter === 'all') {
-                q = query(bookingsRef);
-            } else {
-                q = query(bookingsRef, where('status', '==', testFilter));
-            }
-
-            const snapshot = await getDocs(q);
-            console.log(`Found ${snapshot.size} bookings for filter '${testFilter}'`);
-
-            if (snapshot.size > 0) {
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    console.log(`  - Booking ${doc.id}: status=${data.status}, room=${data.roomNumber}, date=${data.date}`);
-                });
-            }
-
-        } catch (error) {
-            console.error(`Error testing filter '${testFilter}':`, error);
-        }
-    }
-
-    console.log('=== Filter Test Completed ===');
-    alert('Filter test completed. Check console for results.');
-};
-
 // Load all reservations
 window.loadReservations = async function () {
     try {
         const filter = document.getElementById('reservation-filter')?.value || 'all';
-        console.log('Loading reservations with filter:', filter);
 
         const bookingsRef = collection(db, 'bookings');
-        const reservationsTable = document.getElementById('reservations-table');
-
-        // Show loading state
+        const reservationsTable = document.getElementById('reservations-table');        // Show loading state
         reservationsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Loading reservations...</td></tr>';
 
         let snapshot;
@@ -712,14 +659,3 @@ window.onclick = function (event) {
 };
 
 console.log('✅ Admin dashboard loaded');
-
-// Add a test function to verify the script is working
-window.testAdminDashboard = function () {
-    console.log('Admin dashboard test function called');
-    alert('Admin dashboard script is loaded and working!');
-};
-
-// Log when key functions are defined
-console.log('showRoomScheduleModal function defined:', typeof window.showRoomScheduleModal);
-console.log('loadRooms function defined:', typeof loadRooms);
-console.log('deleteRoom function defined:', typeof window.deleteRoom);
