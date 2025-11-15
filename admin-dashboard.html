@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Librarian Dashboard - KPU Library</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=2.0">
 </head>
 
 <body style="background: #f5f7fa;">
@@ -47,15 +47,14 @@
                             <th>Room Number</th>
                             <th>Floor</th>
                             <th>Capacity</th>
-                            <th>Available Days</th>
-                            <th>Available Hours</th>
+                            <th>Available Date Range</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="rooms-table">
                         <tr>
-                            <td colspan="7" style="text-align: center; color: #999;">Loading rooms...</td>
+                            <td colspan="6" style="text-align: center; color: #999;">Loading rooms...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -164,40 +163,22 @@
 
             <form id="room-schedule-form">
                 <div class="form-group">
-                    <label>Available Days of Week</label>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" name="days" value="monday"> Monday
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" name="days" value="tuesday"> Tuesday
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" name="days" value="wednesday"> Wednesday
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" name="days" value="thursday"> Thursday
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" name="days" value="friday"> Friday
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" name="days" value="saturday"> Saturday
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" name="days" value="sunday"> Sunday
-                        </label>
-                    </div>
+                    <label for="schedule-start-date">Available From Date</label>
+                    <input type="date" id="schedule-start-date" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="schedule-start-time">Available From</label>
-                    <input type="time" id="schedule-start-time" required>
+                    <label for="schedule-end-date">Available Until Date</label>
+                    <input type="date" id="schedule-end-date" required>
                 </div>
 
-                <div class="form-group">
-                    <label for="schedule-end-time">Available Until</label>
-                    <input type="time" id="schedule-end-time" required>
+                <div
+                    style="padding: 15px; background-color: #e8f4f8; border-left: 4px solid #17a2b8; border-radius: 5px; margin: 15px 0;">
+                    <p style="margin: 0; color: #117a8b;">
+                        <strong>ℹ️ Note:</strong> Rooms will be available all day (24 hours) within the selected date
+                        range.
+                        Specific time slots will only be unavailable when booked by students.
+                    </p>
                 </div>
 
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -274,7 +255,7 @@
         }
     </style>
 
-    <script type="module" src="js/admin-dashboard.js"></script>
+    <script type="module" src="js/admin-dashboard.js?v=3.0"></script>
 </body>
 
 </html>

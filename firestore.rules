@@ -10,12 +10,14 @@ service cloud.firestore {
     // Helper function to check if user is a librarian
     function isLibrarian() {
       return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'librarian';
     }
     
     // Helper function to check if user is a student
     function isStudent() {
       return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
     }
     
@@ -33,8 +35,8 @@ service cloud.firestore {
     
     // Rooms collection
     match /rooms/{roomId} {
-      // Anyone authenticated can read rooms
-      allow read: if isSignedIn();
+      // Anyone can read rooms (no authentication required for viewing room info)
+      allow read: if true;
       
       // Only librarians can create, update, or delete rooms
       allow create, update, delete: if isLibrarian();

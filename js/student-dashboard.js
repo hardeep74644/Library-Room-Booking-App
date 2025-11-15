@@ -1,4 +1,5 @@
-// Student Dashboard functionality
+// Student Dashboard functionality - v3.0 (All Day Availability)
+console.log('Student Dashboard v3.0 loaded - All Day Availability Enabled');
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
@@ -54,6 +55,9 @@ onAuthStateChanged(auth, async (user) => {
 
             // Load user's bookings
             loadMyBookings();
+
+            // Set minimum date for booking to today
+            setMinimumBookingDate();
         } catch (error) {
             console.error('Error loading user data:', error);
             alert('Error loading user data. Please try refreshing the page.');
@@ -63,6 +67,16 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = 'login.html';
     }
 });
+
+// Set minimum date for booking to today
+function setMinimumBookingDate() {
+    const today = new Date().toISOString().split('T')[0];
+    const bookingDateInput = document.getElementById('booking-date');
+    if (bookingDateInput) {
+        bookingDateInput.min = today;
+        bookingDateInput.value = today; // Set default to today
+    }
+}
 
 // Select capacity
 window.selectCapacity = function (capacity) {
@@ -163,62 +177,115 @@ function calculateEndTime(startTime, duration) {
 }
 
 // Check if room is available at the specified time
+// Check if room is available at the specified time
 async function checkRoomAvailability(roomId, date, startTime, endTime) {
     try {
         // First check if the room has a schedule and if the requested time fits
         const roomDoc = await getDoc(doc(db, 'rooms', roomId));
-        const roomData = roomDoc.data();
-        const schedule = roomData.schedule;
 
-        if (schedule) {
-            // Check if the requested day is available
-            const requestedDate = new Date(date);
-            const dayOfWeek = requestedDate.toLocaleDateString('en-US', { weekday: 'lowercase' });
-
-            if (!schedule.days || !schedule.days.includes(dayOfWeek)) {
-                console.log(`Room ${roomData.number} not available on ${dayOfWeek}`);
-                return false;
-            }
-
-            // Check if the requested time is within available hours
-            if (schedule.startTime && schedule.endTime) {
-                if (startTime < schedule.startTime || endTime > schedule.endTime) {
-                    console.log(`Room ${roomData.number} not available during ${startTime}-${endTime} (available ${schedule.startTime}-${schedule.endTime})`);
-                    return false;
-                }
-            }
-        } else {
-            // If no schedule is set, room is not available
-            console.log(`Room ${roomData.number} has no schedule set`);
+        if (!roomDoc.exists()) {
+            console.log(`Room with ID ${roomId} not found`);
             return false;
         }
 
-        // Then check for booking conflicts
-        const bookingsRef = collection(db, 'bookings');
-        const q = query(
-            bookingsRef,
-            where('roomId', '==', roomId),
-            where('date', '==', date),
-            where('status', '==', 'active')
-        );
+        const roomData = roomDoc.data();
+        const schedule = roomData.schedule;
 
-        const bookingsSnapshot = await getDocs(q);
+        console.log(`Checking availability for Room ${roomData.number}:`, {
+            requestedDate: date,
+            requestedTime: `${startTime} - ${endTime}`,
+            schedule: schedule
+        });
 
-        // Check for overlapping bookings
-        for (const booking of bookingsSnapshot.docs) {
-            const bookingData = booking.data();
-            const bookingStart = bookingData.startTime;
-            const bookingEnd = bookingData.endTime;
-
-            // Check if times overlap
-            if (timesOverlap(startTime, endTime, bookingStart, bookingEnd)) {
+        if (schedule) {
+            // Check if schedule has the new date range format
+            if (!schedule.startDate || !schedule.endDate) {
+                console.log(`Room ${roomData.number} has old schedule format or missing date range:`, schedule);
                 return false;
             }
+
+            // Check if the requested date is within the available date range
+            const requestedDate = new Date(date);
+            const scheduleStartDate = new Date(schedule.startDate);
+            const scheduleEndDate = new Date(schedule.endDate);
+
+            // Ensure all dates are valid
+            if (isNaN(requestedDate.getTime()) || isNaN(scheduleStartDate.getTime()) || isNaN(scheduleEndDate.getTime())) {
+                console.log(`Room ${roomData.number} has invalid date format:`, {
+                    requestedDate: date,
+                    scheduleStartDate: schedule.startDate,
+                    scheduleEndDate: schedule.endDate
+                });
+                return false;
+            }
+
+            console.log(`Date comparison for Room ${roomData.number}:`, {
+                requestedDate: requestedDate.toDateString(),
+                scheduleStartDate: scheduleStartDate.toDateString(),
+                scheduleEndDate: scheduleEndDate.toDateString(),
+                requestedDateISO: requestedDate.toISOString(),
+                scheduleStartDateISO: scheduleStartDate.toISOString(),
+                scheduleEndDateISO: scheduleEndDate.toISOString(),
+                withinRange: requestedDate >= scheduleStartDate && requestedDate <= scheduleEndDate
+            });
+
+            // Use date comparison (not time comparison)
+            const requestedDateOnly = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate());
+            const startDateOnly = new Date(scheduleStartDate.getFullYear(), scheduleStartDate.getMonth(), scheduleStartDate.getDate());
+            const endDateOnly = new Date(scheduleEndDate.getFullYear(), scheduleEndDate.getMonth(), scheduleEndDate.getDate());
+
+            if (requestedDateOnly < startDateOnly || requestedDateOnly > endDateOnly) {
+                console.log(`Room ${roomData.number} not available on ${date} (available from ${schedule.startDate} to ${schedule.endDate})`);
+                return false;
+            }
+
+            // Rooms are available all day within the date range - no time restrictions from schedule
+            console.log(`Room ${roomData.number} is within available date range - checking for booking conflicts`);
+        } else {
+            // If no schedule is set, room is not available
+            console.log(`Room ${roomData.number} has no schedule set - please ask librarian to set availability`);
+            return false;
         }
 
-        return true;
+        // Check for actual booking conflicts (this is the main availability constraint now)
+        try {
+            const bookingsRef = collection(db, 'bookings');
+            const q = query(
+                bookingsRef,
+                where('roomId', '==', roomId),
+                where('date', '==', date),
+                where('status', '==', 'active')
+            );
+
+            const bookingsSnapshot = await getDocs(q);
+
+            // Check for overlapping bookings
+            for (const booking of bookingsSnapshot.docs) {
+                const bookingData = booking.data();
+                const bookingStart = bookingData.startTime;
+                const bookingEnd = bookingData.endTime;
+
+                // Check if times overlap
+                if (timesOverlap(startTime, endTime, bookingStart, bookingEnd)) {
+                    console.log(`Room ${roomData.number} has conflicting booking: ${bookingStart}-${bookingEnd}`);
+                    return false;
+                }
+            }
+
+            console.log(`Room ${roomData.number} is available - no conflicts found`);
+            return true;
+
+        } catch (bookingError) {
+            console.log('Error checking booking conflicts (may need Firebase index):', bookingError.message);
+            // If we can't check conflicts due to permission/index issues, assume available for now
+            // The actual booking will check for conflicts when it's created
+            console.log(`Room ${roomData.number} is available based on schedule (couldn't check conflicts)`);
+            return true;
+        }
+
     } catch (error) {
         console.error('Error checking availability:', error);
+        console.log('Availability check failed due to permissions or other error');
         return false;
     }
 }
@@ -252,9 +319,8 @@ async function displayAvailableRooms(rooms, date, startTime, endTime) {
             roomDiv.className = 'room-item';
 
             let scheduleInfo = '';
-            if (schedule && schedule.days && schedule.startTime && schedule.endTime) {
-                const daysFormatted = schedule.days.map(day => day.charAt(0).toUpperCase() + day.slice(1)).join(', ');
-                scheduleInfo = `<p style="margin: 5px 0; color: #666; font-size: 0.9em;">📅 Available: ${daysFormatted} | ⏰ ${schedule.startTime} - ${schedule.endTime}</p>`;
+            if (schedule && schedule.startDate && schedule.endDate) {
+                scheduleInfo = `<p style="margin: 5px 0; color: #666; font-size: 0.9em;">📅 Available: ${schedule.startDate} to ${schedule.endDate} | ⏰ All Day</p>`;
             }
 
             roomDiv.innerHTML = `
@@ -367,14 +433,32 @@ async function checkUserActiveBooking() {
 
 // Load user's bookings
 async function loadMyBookings() {
+    if (!currentUser) {
+        console.log('No user authenticated');
+        return;
+    }
+
     try {
         const bookingsRef = collection(db, 'bookings');
-        const q = query(
-            bookingsRef,
-            where('userId', '==', currentUser.uid),
-            where('status', '==', 'active'),
-            orderBy('createdAt', 'desc')
-        );
+
+        // Try the complex query first
+        let q;
+        try {
+            q = query(
+                bookingsRef,
+                where('userId', '==', currentUser.uid),
+                where('status', '==', 'active'),
+                orderBy('createdAt', 'desc')
+            );
+        } catch (indexError) {
+            console.log('Using simpler query due to index requirement');
+            // Fallback to simpler query if index doesn't exist
+            q = query(
+                bookingsRef,
+                where('userId', '==', currentUser.uid),
+                where('status', '==', 'active')
+            );
+        }
 
         const snapshot = await getDocs(q);
         const bookingsTable = document.getElementById('bookings-table');
@@ -408,6 +492,10 @@ async function loadMyBookings() {
 
     } catch (error) {
         console.error('Error loading bookings:', error);
+        // Show fallback message
+        const bookingsTable = document.getElementById('bookings-table');
+        bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">Error loading bookings. You may need to create Firebase indexes.</td></tr>';
+        document.getElementById('booking-alert').style.display = 'none';
     }
 }
 

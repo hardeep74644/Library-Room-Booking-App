@@ -1,4 +1,5 @@
-// Admin Dashboard functionality
+// Admin Dashboard functionality - v3.0 (All Day Availability)
+console.log('Admin Dashboard v3.0 loaded - All Day Availability Enabled');
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
@@ -106,12 +107,8 @@ async function loadRooms() {
             const room = doc.data();
             const schedule = room.schedule || {};
 
-            // Format available days
-            const availableDays = schedule.days ? schedule.days.join(', ') : 'Not set';
-
-            // Format available hours
-            const availableHours = schedule.startTime && schedule.endTime
-                ? `${schedule.startTime} - ${schedule.endTime}`
+            const availableDates = schedule.startDate && schedule.endDate
+                ? `${schedule.startDate} to ${schedule.endDate}`
                 : 'Not set';
 
             console.log(`Creating row for room ${room.number} with schedule:`, schedule);
@@ -122,8 +119,7 @@ async function loadRooms() {
                 <td>Room ${room.number}</td>
                 <td>Floor ${room.floor}</td>
                 <td>${room.capacity} people</td>
-                <td><span style="font-size: 0.9em;">${availableDays}</span></td>
-                <td><span style="font-size: 0.9em;">${availableHours}</span></td>
+                <td><span style="font-size: 0.9em;">${availableDates}</span></td>
                 <td><span class="available-badge available">Active</span></td>
                 <td>
                     <button class="btn-secondary" onclick="showRoomScheduleModal('${doc.id}', '${room.number}')" style="margin-right: 5px; font-size: 0.85em;">Schedule</button>
@@ -258,6 +254,11 @@ window.showRoomScheduleModal = async function (roomId, roomNumber) {
     modal.style.display = 'block';
     document.getElementById('schedule-room-name').textContent = `Room ${roomNumber}`;
 
+    // Set minimum date to today for new schedules
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('schedule-start-date').min = today;
+    document.getElementById('schedule-end-date').min = today;
+
     // Store current room ID for later use
     window.currentScheduleRoomId = roomId;
 
@@ -269,22 +270,14 @@ window.showRoomScheduleModal = async function (roomId, roomNumber) {
 
         console.log('Existing schedule:', schedule);
 
-        // Clear all checkboxes first
-        document.querySelectorAll('input[name="days"]').forEach(checkbox => {
-            checkbox.checked = false;
+        // Set date range values
+        document.getElementById('schedule-start-date').value = schedule.startDate || '';
+        document.getElementById('schedule-end-date').value = schedule.endDate || '';
+
+        // Update end date minimum when start date changes
+        document.getElementById('schedule-start-date').addEventListener('change', function () {
+            document.getElementById('schedule-end-date').min = this.value;
         });
-
-        // Check the days that are available
-        if (schedule.days) {
-            schedule.days.forEach(day => {
-                const checkbox = document.querySelector(`input[name="days"][value="${day}"]`);
-                if (checkbox) checkbox.checked = true;
-            });
-        }
-
-        // Set time values
-        document.getElementById('schedule-start-time').value = schedule.startTime || '09:00';
-        document.getElementById('schedule-end-time').value = schedule.endTime || '17:00';
 
     } catch (error) {
         console.error('Error loading room schedule:', error);
@@ -351,37 +344,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Get selected days
-            const selectedDays = [];
-            document.querySelectorAll('input[name="days"]:checked').forEach(checkbox => {
-                selectedDays.push(checkbox.value);
-            });
+            // Get date range values
+            const startDate = document.getElementById('schedule-start-date').value;
+            const endDate = document.getElementById('schedule-end-date').value;
 
-            if (selectedDays.length === 0) {
-                alert('Please select at least one day');
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
                 return;
             }
 
-            const startTime = document.getElementById('schedule-start-time').value;
-            const endTime = document.getElementById('schedule-end-time').value;
+            // Validate date range
+            const startDateObj = new Date(startDate);
+            const endDateObj = new Date(endDate);
 
-            if (!startTime || !endTime) {
-                alert('Please set both start and end times');
-                return;
-            }
-
-            if (startTime >= endTime) {
-                alert('End time must be after start time');
+            if (startDateObj > endDateObj) {
+                alert('End date must be after start date');
                 return;
             }
 
             try {
-                // Update room with schedule
+                // Update room with schedule (no time restrictions - available all day)
                 await updateDoc(doc(db, 'rooms', window.currentScheduleRoomId), {
                     schedule: {
-                        days: selectedDays,
-                        startTime: startTime,
-                        endTime: endTime,
+                        startDate: startDate,
+                        endDate: endDate,
+                        // No time restrictions - rooms are available all day
+                        allDay: true,
                         updatedAt: Timestamp.now()
                     }
                 });
