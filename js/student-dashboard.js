@@ -9,6 +9,7 @@ import {
     getDoc,
     doc,
     setDoc,
+    updateDoc,
     query,
     where,
     deleteDoc,
@@ -24,21 +25,27 @@ let selectedRoom = null;
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
+        console.log('✅ User authenticated:', user.email);
 
         try {
             const userDoc = await getDoc(doc(db, 'users', user.uid));
-            const userData = userDoc.data();
+            let userData = userDoc.data();
 
             if (!userData) {
+                console.log('⚠️ User document not found, creating default student profile...');
                 // If user document doesn't exist, create it with default student role
-                await setDoc(doc(db, 'users', user.uid), {
+                userData = {
                     name: user.displayName || user.email,
                     email: user.email,
                     role: 'student',
                     createdAt: new Date().toISOString()
-                });
-                userData = { role: 'student', name: user.displayName || user.email };
+                };
+
+                await setDoc(doc(db, 'users', user.uid), userData);
+                console.log('✅ Created user document with student role');
             }
+
+            console.log('👤 User data:', userData);
 
             // Update welcome message
             const nameElement = document.querySelector('.user-info strong');
@@ -48,10 +55,13 @@ onAuthStateChanged(auth, async (user) => {
 
             // Check if user is a student
             if (userData?.role !== 'student') {
+                console.log('❌ Access denied - user role:', userData?.role);
                 alert('Access denied. This page is for students only.');
                 window.location.href = 'admin-dashboard.html';
                 return;
             }
+
+            console.log('✅ Student access confirmed, loading bookings...');
 
             // Load user's bookings
             loadMyBookings();
@@ -59,11 +69,24 @@ onAuthStateChanged(auth, async (user) => {
             // Set minimum date for booking to today
             setMinimumBookingDate();
         } catch (error) {
-            console.error('Error loading user data:', error);
-            alert('Error loading user data. Please try refreshing the page.');
+            console.error('❌ Error loading user data:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
+
+            // Show user-friendly error
+            const nameElement = document.querySelector('.user-info strong');
+            if (nameElement) {
+                nameElement.textContent = 'Error loading user data';
+            }
+
+            // Try to load bookings anyway for testing
+            console.log('⚠️ Attempting to load bookings despite user data error...');
+            setTimeout(() => {
+                loadMyBookings();
+            }, 1000);
         }
     } else {
-        console.log('No user authenticated, redirecting to login');
+        console.log('❌ No user authenticated, redirecting to login');
         window.location.href = 'login.html';
     }
 });
@@ -108,6 +131,35 @@ window.searchAvailableRooms = async function () {
 
     if (selectedDate < today) {
         alert('Cannot book rooms for past dates');
+        return;
+    }
+
+    // Check if booking time is within allowed hours (9am - 9pm)
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const startMinutes = hours * 60 + minutes;
+    const endTime = calculateEndTime(startTime, duration);
+    const [endHours, endMinutes] = endTime.split(':').map(Number);
+    const endMinutesTotal = endHours * 60 + endMinutes;
+
+    // 9:00 AM = 9 * 60 = 540 minutes
+    // 9:00 PM = 21 * 60 = 1260 minutes
+    const allowedStartTime = 9 * 60; // 9:00 AM
+    const allowedEndTime = 21 * 60;  // 9:00 PM
+
+    if (startMinutes < allowedStartTime || endMinutesTotal > allowedEndTime) {
+        let message = '⏰ Room booking is only available between 9:00 AM and 9:00 PM.\n\n';
+
+        if (startMinutes < allowedStartTime) {
+            message += `• Your selected start time (${startTime}) is before 9:00 AM\n`;
+        }
+
+        if (endMinutesTotal > allowedEndTime) {
+            message += `• Your booking would end at ${endTime}, which is after 9:00 PM\n`;
+        }
+
+        message += '\nPlease select a different time slot within the allowed hours.';
+
+        alert(message);
         return;
     }
 
@@ -260,14 +312,18 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
             const bookingsSnapshot = await getDocs(q);
 
             // Check for overlapping bookings
+            console.log(`🔍 Checking ${bookingsSnapshot.size} existing bookings for conflicts...`);
+
             for (const booking of bookingsSnapshot.docs) {
                 const bookingData = booking.data();
                 const bookingStart = bookingData.startTime;
                 const bookingEnd = bookingData.endTime;
 
+                console.log(`📋 Existing booking: ${bookingStart}-${bookingEnd} | Requested: ${startTime}-${endTime}`);
+
                 // Check if times overlap
                 if (timesOverlap(startTime, endTime, bookingStart, bookingEnd)) {
-                    console.log(`Room ${roomData.number} has conflicting booking: ${bookingStart}-${bookingEnd}`);
+                    console.log(`❌ Room ${roomData.number} has conflicting booking: ${bookingStart}-${bookingEnd}`);
                     return false;
                 }
             }
@@ -292,8 +348,35 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
 
 // Check if two time ranges overlap
 function timesOverlap(start1, end1, start2, end2) {
-    return (start1 < end2 && end1 > start2);
+    // Convert times to comparable format for debugging
+    const overlap = (start1 < end2 && end1 > start2);
+
+    console.log(`⏰ Time overlap check: (${start1}-${end1}) vs (${start2}-${end2}) = ${overlap}`);
+
+    return overlap;
 }
+
+// Test function for overlap detection (for debugging)
+window.testTimeOverlap = function () {
+    console.log('🧪 Testing time overlap function:');
+
+    // Test cases
+    const tests = [
+        { name: 'Exact same time', req: ['10:00', '11:00'], existing: ['10:00', '11:00'], expected: true },
+        { name: 'Partial overlap - start', req: ['09:30', '10:30'], existing: ['10:00', '11:00'], expected: true },
+        { name: 'Partial overlap - end', req: ['10:30', '11:30'], existing: ['10:00', '11:00'], expected: true },
+        { name: 'Completely inside', req: ['10:15', '10:45'], existing: ['10:00', '11:00'], expected: true },
+        { name: 'Completely outside', req: ['11:00', '12:00'], existing: ['10:00', '11:00'], expected: false },
+        { name: 'Back to back - no overlap', req: ['11:00', '12:00'], existing: ['10:00', '11:00'], expected: false },
+        { name: 'Before - no overlap', req: ['09:00', '10:00'], existing: ['10:00', '11:00'], expected: false }
+    ];
+
+    tests.forEach(test => {
+        const result = timesOverlap(test.req[0], test.req[1], test.existing[0], test.existing[1]);
+        const status = result === test.expected ? '✅' : '❌';
+        console.log(`${status} ${test.name}: ${result} (expected: ${test.expected})`);
+    });
+};
 
 // Display available rooms
 async function displayAvailableRooms(rooms, date, startTime, endTime) {
@@ -381,6 +464,20 @@ window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) 
     }
 
     try {
+        // IMPORTANT: Re-check room availability right before booking to prevent race conditions
+        console.log('🔍 Final availability check before booking...');
+        const isStillAvailable = await checkRoomAvailability(roomId, date, startTime, endTime);
+
+        if (!isStillAvailable) {
+            alert('Sorry, this room has just been booked by another user. Please search for available rooms again.');
+
+            // Hide available rooms section and refresh
+            document.getElementById('available-rooms-section').style.display = 'none';
+            return;
+        }
+
+        console.log('✅ Room still available, proceeding with booking...');
+
         // Create booking
         await addDoc(collection(db, 'bookings'), {
             userId: currentUser.uid,
@@ -408,8 +505,19 @@ window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) 
         document.getElementById('room-search').value = '';
 
     } catch (error) {
-        console.error('Error booking room:', error);
-        alert('Failed to book room. Please try again.');
+        console.error('❌ Error booking room:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+
+        if (error.code === 'permission-denied') {
+            alert('Permission denied: Please make sure you are logged in properly.');
+        } else if (error.message.includes('conflict') || error.message.includes('already exists')) {
+            alert('This room has been booked by another user just now. Please search for available rooms again.');
+            // Hide available rooms section to force refresh
+            document.getElementById('available-rooms-section').style.display = 'none';
+        } else {
+            alert('Failed to book room. This might be due to a booking conflict. Please try searching for available rooms again.');
+        }
     }
 };
 
@@ -438,65 +546,241 @@ async function loadMyBookings() {
         return;
     }
 
+    console.log('🔄 Loading bookings for user:', currentUser.uid);
+    const bookingsTable = document.getElementById('bookings-table');
+
+    // Show loading state
+    bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Loading bookings...</td></tr>';
+
     try {
         const bookingsRef = collection(db, 'bookings');
+        console.log('📋 Querying bookings collection...');
 
-        // Try the complex query first
-        let q;
-        try {
-            q = query(
-                bookingsRef,
-                where('userId', '==', currentUser.uid),
-                where('status', '==', 'active'),
-                orderBy('createdAt', 'desc')
-            );
-        } catch (indexError) {
-            console.log('Using simpler query due to index requirement');
-            // Fallback to simpler query if index doesn't exist
-            q = query(
-                bookingsRef,
-                where('userId', '==', currentUser.uid),
-                where('status', '==', 'active')
-            );
-        }
+        // Use simple query first to avoid index issues
+        let q = query(
+            bookingsRef,
+            where('userId', '==', currentUser.uid)
+        );
 
+        console.log('🔍 Executing query...');
         const snapshot = await getDocs(q);
-        const bookingsTable = document.getElementById('bookings-table');
+        console.log('✅ Query completed. Found', snapshot.size, 'total bookings');
 
         if (snapshot.empty) {
-            bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No active bookings</td></tr>';
+            console.log('ℹ️ No bookings found for user');
+            bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No bookings found</td></tr>';
             document.getElementById('booking-alert').style.display = 'none';
             return;
         }
 
+        // Filter and display bookings
+        const activeBookings = [];
+        const allBookings = [];
+
+        // Check for expired bookings and update them to completed
+        const now = new Date();
+        const expiredBookingIds = [];
+
+        for (const docSnapshot of snapshot.docs) {
+            const booking = docSnapshot.data();
+            const bookingWithId = { ...booking, id: docSnapshot.id };
+
+            // Check if active booking has expired
+            if (booking.status === 'active' && booking.date && booking.endTime) {
+                const bookingDateTime = new Date(`${booking.date}T${booking.endTime}:00`);
+
+                if (bookingDateTime < now) {
+                    console.log('⏰ Found expired booking:', bookingWithId);
+                    expiredBookingIds.push({
+                        id: bookingWithId.id,
+                        bookingData: bookingWithId
+                    });
+
+                    // Update the booking object for immediate UI update
+                    bookingWithId.status = 'completed';
+                    bookingWithId.completedAt = Timestamp.now();
+                }
+            }
+
+            console.log('📋 Processing booking:', bookingWithId);
+            allBookings.push(bookingWithId);
+
+            if (bookingWithId.status === 'active') {
+                activeBookings.push(bookingWithId);
+            }
+        }
+
+        // Update expired bookings in the database
+        if (expiredBookingIds.length > 0) {
+            console.log(`🔄 Updating ${expiredBookingIds.length} expired booking(s) to completed status`);
+
+            // Update bookings in parallel
+            const updatePromises = expiredBookingIds.map(async ({ id, bookingData }) => {
+                try {
+                    await updateDoc(doc(db, 'bookings', id), {
+                        status: 'completed',
+                        completedAt: Timestamp.now()
+                    });
+                    console.log(`✅ Updated booking ${id} to completed`);
+                } catch (error) {
+                    console.error(`❌ Failed to update booking ${id}:`, error);
+                }
+            });
+
+            // Wait for all updates to complete
+            await Promise.allSettled(updatePromises);
+        }
+
+        console.log('📊 Found', activeBookings.length, 'active bookings out of', allBookings.length, 'total');
+
         bookingsTable.innerHTML = '';
 
-        snapshot.forEach(doc => {
-            const booking = doc.data();
+        if (activeBookings.length === 0) {
+            bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No active bookings</td></tr>';
+            document.getElementById('booking-alert').style.display = 'none';
+
+            // Show booking history if available
+            if (allBookings.length > 0) {
+                showBookingHistory(allBookings);
+            }
+            return;
+        }
+
+        // Sort active bookings by date and time (client-side)
+        activeBookings.sort((a, b) => {
+            const dateCompare = new Date(b.date) - new Date(a.date);
+            if (dateCompare !== 0) return dateCompare;
+            return b.startTime.localeCompare(a.startTime);
+        });
+
+        // Display active bookings
+        activeBookings.forEach(booking => {
             const row = document.createElement('tr');
-
             row.innerHTML = `
-                <td>Room ${booking.roomNumber}</td>
-                <td>${booking.date}</td>
-                <td>${booking.startTime} - ${booking.endTime}</td>
-                <td>${calculateDuration(booking.startTime, booking.endTime)}</td>
+                <td>Room ${booking.roomNumber || 'N/A'}</td>
+                <td>${booking.date || 'N/A'}</td>
+                <td>${booking.startTime || 'N/A'} - ${booking.endTime || 'N/A'}</td>
+                <td>${booking.startTime && booking.endTime ? calculateDuration(booking.startTime, booking.endTime) : 'N/A'}</td>
                 <td><span class="status-active">Active</span></td>
-                <td><button class="btn-danger" onclick="cancelBooking('${doc.id}')">Cancel</button></td>
+                <td><button class="btn-danger" onclick="cancelBooking('${booking.id}')">Cancel</button></td>
             `;
-
             bookingsTable.appendChild(row);
         });
 
         // Show alert if user has active booking
         document.getElementById('booking-alert').style.display = 'block';
+        console.log('✅ Active bookings displayed successfully');
+
+        // Show booking history
+        showBookingHistory(allBookings);
 
     } catch (error) {
-        console.error('Error loading bookings:', error);
-        // Show fallback message
+        console.error('❌ Error loading bookings:', error);
+        console.error('Error details:', error.code, error.message);
+
+        // Show detailed error message
         const bookingsTable = document.getElementById('bookings-table');
-        bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">Error loading bookings. You may need to create Firebase indexes.</td></tr>';
+        bookingsTable.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; color: #dc3545;">
+                    Error loading bookings: ${error.message}<br>
+                    <small>Check browser console for details</small>
+                </td>
+            </tr>
+        `;
         document.getElementById('booking-alert').style.display = 'none';
     }
+}
+
+// Show booking history
+function showBookingHistory(allBookings) {
+    // Create booking history section if it doesn't exist
+    let historySection = document.getElementById('booking-history-section');
+    if (!historySection) {
+        const dashboard = document.querySelector('.dashboard');
+        historySection = document.createElement('div');
+        historySection.id = 'booking-history-section';
+        historySection.className = 'card';
+        historySection.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📚 Booking History</h2>
+                <button onclick="refreshBookingHistory()" class="btn-secondary">🔄 Refresh</button>
+            </div>
+            <div id="booking-history">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Room Number</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Cancellation Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table">
+                    </tbody>
+                </table>
+            </div>
+        `;
+        dashboard.appendChild(historySection);
+    }
+
+    const historyTable = document.getElementById('history-table');
+
+    if (allBookings.length === 0) {
+        historyTable.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #999;">No booking history</td></tr>';
+        return;
+    }
+
+    // Sort all bookings by creation date (newest first)
+    allBookings.sort((a, b) => {
+        if (a.createdAt && b.createdAt) {
+            return b.createdAt.toMillis() - a.createdAt.toMillis();
+        }
+        return new Date(b.date) - new Date(a.date);
+    });
+
+    historyTable.innerHTML = '';
+
+    // Show last 10 bookings
+    allBookings.slice(0, 10).forEach(booking => {
+        const row = document.createElement('tr');
+        const createdAt = booking.createdAt ?
+            new Date(booking.createdAt.toMillis()).toLocaleDateString() : 'N/A';
+
+        let statusClass = 'status-active';
+        let statusText = booking.status || 'Unknown';
+        let cancellationDate = 'N/A';
+
+        if (booking.status === 'cancelled') {
+            statusClass = 'status-cancelled';
+            statusText = 'Cancelled';
+            cancellationDate = booking.cancelledAt ?
+                new Date(booking.cancelledAt.toMillis()).toLocaleDateString() : 'N/A';
+        } else if (booking.status === 'active') {
+            statusText = 'Active';
+            cancellationDate = 'N/A';
+        } else if (booking.status === 'completed') {
+            statusClass = 'status-completed';
+            statusText = 'Completed';
+            cancellationDate = 'N/A'; // Completed bookings don't have cancellation dates
+        }
+
+        row.innerHTML = `
+            <td>Room ${booking.roomNumber || 'N/A'}</td>
+            <td>${booking.date || 'N/A'}</td>
+            <td>${booking.startTime || 'N/A'} - ${booking.endTime || 'N/A'}</td>
+            <td>${booking.startTime && booking.endTime ? calculateDuration(booking.startTime, booking.endTime) : 'N/A'}</td>
+            <td><span class="${statusClass}">${statusText}</span></td>
+            <td>${createdAt}</td>
+            <td>${cancellationDate}</td>
+        `;
+        historyTable.appendChild(row);
+    });
+
+    console.log('📚 Booking history displayed with', allBookings.length, 'total bookings');
 }
 
 // Calculate duration for display
@@ -522,13 +806,62 @@ window.cancelBooking = async function (bookingId) {
     }
 
     try {
-        await deleteDoc(doc(db, 'bookings', bookingId));
+        console.log('🔄 Attempting to cancel booking:', bookingId);
+        console.log('👤 Current user:', currentUser?.uid);
+
+        // Update the booking status to 'cancelled' instead of deleting
+        await updateDoc(doc(db, 'bookings', bookingId), {
+            status: 'cancelled',
+            cancelledAt: Timestamp.now()
+        });
+
+        console.log('✅ Booking cancelled successfully');
         alert('Booking cancelled successfully');
         loadMyBookings();
     } catch (error) {
-        console.error('Error cancelling booking:', error);
-        alert('Failed to cancel booking. Please try again.');
+        console.error('❌ Error cancelling booking:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+
+        if (error.code === 'permission-denied') {
+            alert('Permission denied: Please make sure you are logged in and the Firebase security rules are updated. Check the console for details.');
+        } else {
+            alert('Failed to cancel booking. Please try again. Check console for error details.');
+        }
     }
+};
+
+// Refresh bookings manually
+window.refreshBookings = function () {
+    console.log('🔄 Manual refresh requested');
+    if (!currentUser) {
+        console.log('❌ No authenticated user');
+        alert('Please login first');
+        return;
+    }
+
+    const bookingsTable = document.getElementById('bookings-table');
+    bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Refreshing...</td></tr>';
+
+    loadMyBookings();
+};
+
+// Refresh booking history manually
+window.refreshBookingHistory = function () {
+    console.log('🔄 Manual booking history refresh requested');
+    if (!currentUser) {
+        console.log('❌ No authenticated user');
+        alert('Please login first');
+        return;
+    }
+
+    const historyTable = document.getElementById('history-table');
+    if (historyTable) {
+        historyTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Refreshing history...</td></tr>';
+    }
+
+    // Reload all bookings to refresh history
+    loadMyBookings();
 };
 
 // Logout
@@ -544,12 +877,48 @@ window.logout = async function () {
     }
 };
 
-// Set minimum date to today
+// Set minimum date to today and add time validation
 document.addEventListener('DOMContentLoaded', () => {
     const dateInput = document.getElementById('booking-date');
     if (dateInput) {
         const today = new Date().toISOString().split('T')[0];
         dateInput.min = today;
+    }
+
+    // Add time validation for booking hours
+    const timeInput = document.getElementById('start-time');
+    const durationSelect = document.getElementById('duration');
+
+    function validateBookingTime() {
+        const startTime = timeInput.value;
+        const duration = durationSelect.value;
+
+        if (startTime) {
+            const [hours, minutes] = startTime.split(':').map(Number);
+            const startMinutes = hours * 60 + minutes;
+            const endTime = calculateEndTime(startTime, duration);
+            const [endHours, endMinutes] = endTime.split(':').map(Number);
+            const endMinutesTotal = endHours * 60 + endMinutes;
+
+            const allowedStartTime = 9 * 60; // 9:00 AM
+            const allowedEndTime = 21 * 60;  // 9:00 PM
+
+            // Visual feedback for invalid times
+            if (startMinutes < allowedStartTime || endMinutesTotal > allowedEndTime) {
+                timeInput.style.borderColor = '#dc3545';
+                timeInput.style.backgroundColor = '#ffe6e6';
+                timeInput.title = `Booking must be between 9:00 AM - 9:00 PM. Your booking would end at ${endTime}.`;
+            } else {
+                timeInput.style.borderColor = '#28a745';
+                timeInput.style.backgroundColor = '#e6ffe6';
+                timeInput.title = `Valid booking time. Your booking will end at ${endTime}.`;
+            }
+        }
+    }
+
+    if (timeInput && durationSelect) {
+        timeInput.addEventListener('change', validateBookingTime);
+        durationSelect.addEventListener('change', validateBookingTime);
     }
 });
 

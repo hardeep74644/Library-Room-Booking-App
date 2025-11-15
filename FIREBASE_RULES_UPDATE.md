@@ -1,10 +1,17 @@
 # How to Update Firebase Firestore Security Rules
 
-## The Issue
-The current Firestore security rules don't allow librarians to delete users, which is why you're getting the "Failed to delete user" error.
+## Recent Updates
 
-## Solution
-I've updated the `firestore.rules` file to include delete permissions for librarians.
+### Booking Cancellation & Auto-Completion Fix (Latest)
+**Issue**: Students cannot cancel bookings, and expired bookings don't automatically complete.
+**Cause**: Security rules only allowed librarians to update bookings.
+**Solution**: Updated rules to allow students to update their own bookings when setting status to 'cancelled' or 'completed'.
+
+**New Feature**: Automatic status updates - expired bookings are automatically marked as "completed".
+
+### User Deletion Fix (Previous)
+**Issue**: The current Firestore security rules don't allow librarians to delete users.
+**Solution**: Updated rules to include delete permissions for librarians.
 
 ## How to Deploy the Updated Rules
 
@@ -21,9 +28,24 @@ I've updated the `firestore.rules` file to include delete permissions for librar
 2. Run: `firebase login` (if not already logged in)
 3. Run: `firebase deploy --only firestore:rules`
 
-## Updated Rule Change
-The key change in the users collection rule:
+## Latest Rule Changes
 
+### Bookings Collection Update (Latest)
+**Before:**
+```javascript
+// Only librarians can update bookings
+allow update: if isLibrarian();
+```
+
+**After:**
+```javascript
+// Students can update their own bookings (for cancellation and completion), librarians can update any
+allow update: if isLibrarian() || 
+                 (isSignedIn() && request.auth.uid == resource.data.userId && 
+                  (request.resource.data.status == 'cancelled' || request.resource.data.status == 'completed'));
+```
+
+### Users Collection (Previous Update)
 **Before:**
 ```javascript
 // Librarians can read all users and update roles
@@ -38,15 +60,46 @@ allow read, update, delete: if isLibrarian();
 
 ## Testing After Deployment
 1. Wait 30-60 seconds after deploying the rules
-2. Try deleting a user from the admin dashboard
-3. Check the browser console (F12) for any error messages
-4. The delete operation should now work successfully
+2. Try cancelling a booking from the student dashboard
+3. Try deleting a user from the admin dashboard
+4. **NEW**: Create a booking for a past time slot and refresh the dashboard to see it auto-complete
+5. **NEW**: Verify that students can book again after their previous booking auto-completes
+6. Check the browser console (F12) for any error messages
+7. All operations should now work successfully
 
 ## What These Rules Allow
-- **Students**: Can only read/create their own user document
-- **Librarians**: Can read all users, update user data, and delete users
-- **Security**: Prevents unauthorized access and modifications
+
+### Students:
+- Read/create their own user documents
+- Read/create/delete their own bookings
+- **NEW**: Update their own bookings to cancel or complete them
+- **AUTOMATIC**: Past bookings are automatically marked as completed
+
+### Librarians:
+- Full access to all collections (read/write/update/delete)
+- Manage all bookings and users
+- Create and manage rooms
+
+### Security:
+- Prevents unauthorized access and modifications
+- Students can only cancel or complete their own bookings
+- All other booking updates require librarian permissions
+- **AUTOMATIC**: Expired bookings are auto-completed when dashboard loads
+
+## New Feature: Automatic Booking Completion
+
+### How it works:
+1. When a student loads their dashboard, the system checks all active bookings
+2. If a booking's end time has passed, it's automatically marked as "completed"
+3. Students can then make new bookings (since they no longer have "active" bookings)
+4. Completed bookings appear in the booking history with proper status
+
+### Benefits:
+- **No manual intervention needed** - bookings complete automatically
+- **Students can book again** immediately after their previous booking expires
+- **Clean data management** - clear distinction between active, cancelled, and completed bookings
+- **Better user experience** - no confusion about booking availability
 
 ---
 
-**Note**: Make sure to deploy these rules to Firebase before testing the delete functionality!
+**⚠️ IMPORTANT**: Make sure to deploy these updated rules to Firebase before testing the cancellation functionality!

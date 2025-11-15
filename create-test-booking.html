@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Test Booking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Create Test Booking</h1>
+        <div class="card">
+            <h2>Database Test & Sample Data Creation</h2>
+            <div id="output"
+                style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; font-family: monospace; max-height: 300px; overflow-y: auto;">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button onclick="testFirebaseConnection()" class="btn-primary">Test Firebase Connection</button>
+                <button onclick="listAllBookings()" class="btn-secondary">List All Bookings</button>
+                <button onclick="createSampleBooking()" class="btn-success" style="background: #28a745;">Create Sample
+                    Booking</button>
+            </div>
+
+            <div class="form-group">
+                <label>User Email for Sample Booking:</label>
+                <input type="email" id="sample-email" value="student@test.com" class="form-control">
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, db } from './js/firebase-config.js';
+        import { signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import {
+            collection,
+            addDoc,
+            getDocs,
+            getDoc,
+            doc,
+            query,
+            where,
+            Timestamp
+        } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        const output = document.getElementById('output');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `<p>[${timestamp}] ${message}</p>`;
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        }
+
+        window.testFirebaseConnection = async function () {
+            try {
+                log('🔄 Testing Firebase connection...');
+
+                // Test rooms collection
+                const roomsRef = collection(db, 'rooms');
+                const roomsSnapshot = await getDocs(roomsRef);
+                log('✅ Rooms collection: ' + roomsSnapshot.size + ' documents');
+
+                // Test users collection  
+                const usersRef = collection(db, 'users');
+                const usersSnapshot = await getDocs(usersRef);
+                log('✅ Users collection: ' + usersSnapshot.size + ' documents');
+
+                // Test bookings collection
+                const bookingsRef = collection(db, 'bookings');
+                const bookingsSnapshot = await getDocs(bookingsRef);
+                log('✅ Bookings collection: ' + bookingsSnapshot.size + ' documents');
+
+                log('🎉 Firebase connection test completed!');
+
+            } catch (error) {
+                log('❌ Firebase test failed: ' + error.message);
+                log('Error code: ' + error.code);
+            }
+        };
+
+        window.listAllBookings = async function () {
+            try {
+                log('🔍 Listing all bookings...');
+
+                const bookingsRef = collection(db, 'bookings');
+                const snapshot = await getDocs(bookingsRef);
+
+                log(`📋 Found ${snapshot.size} total bookings:`);
+
+                if (snapshot.empty) {
+                    log('ℹ️ No bookings found in database');
+                    return;
+                }
+
+                snapshot.forEach((doc, index) => {
+                    const booking = doc.data();
+                    log(`${index + 1}. ID: ${doc.id}`);
+                    log(`   Room: ${booking.roomNumber || 'N/A'}`);
+                    log(`   User: ${booking.userId || 'N/A'}`);
+                    log(`   Date: ${booking.date || 'N/A'}`);
+                    log(`   Time: ${booking.startTime || 'N/A'} - ${booking.endTime || 'N/A'}`);
+                    log(`   Status: ${booking.status || 'N/A'}`);
+                    log(`   Created: ${booking.createdAt ? new Date(booking.createdAt.toMillis()).toLocaleString() : 'N/A'}`);
+                    log('   ---');
+                });
+
+            } catch (error) {
+                log('❌ Failed to list bookings: ' + error.message);
+            }
+        };
+
+        window.createSampleBooking = async function () {
+            try {
+                const userEmail = document.getElementById('sample-email').value;
+                if (!userEmail) {
+                    log('❌ Please enter a user email');
+                    return;
+                }
+
+                log('🔄 Creating sample booking...');
+
+                // Find user by email
+                const usersRef = collection(db, 'users');
+                const userQuery = query(usersRef, where('email', '==', userEmail));
+                const userSnapshot = await getDocs(userQuery);
+
+                let userId;
+                if (userSnapshot.empty) {
+                    log(`⚠️ User ${userEmail} not found, creating user...`);
+                    // For testing, we'll use a dummy user ID
+                    userId = 'test-user-' + Date.now();
+                } else {
+                    userId = userSnapshot.docs[0].id;
+                    log(`✅ Found user: ${userId}`);
+                }
+
+                // Create sample booking
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+                const sampleBooking = {
+                    userId: userId,
+                    roomId: 'sample-room-id',
+                    roomNumber: 'R101',
+                    date: tomorrowStr,
+                    startTime: '10:00',
+                    endTime: '11:00',
+                    status: 'active',
+                    createdAt: Timestamp.now()
+                };
+
+                const docRef = await addDoc(collection(db, 'bookings'), sampleBooking);
+                log('✅ Sample booking created with ID: ' + docRef.id);
+                log('📋 Booking details:');
+                log(`   User: ${userId} (${userEmail})`);
+                log(`   Room: ${sampleBooking.roomNumber}`);
+                log(`   Date: ${sampleBooking.date}`);
+                log(`   Time: ${sampleBooking.startTime} - ${sampleBooking.endTime}`);
+                log(`   Status: ${sampleBooking.status}`);
+
+            } catch (error) {
+                log('❌ Failed to create sample booking: ' + error.message);
+                log('Error code: ' + error.code);
+            }
+        };
+
+        // Initialize
+        log('🚀 Booking test tool initialized');
+        log('📝 This tool helps test Firebase connectivity and create sample bookings');
+    </script>
+</body>
+
+</html>

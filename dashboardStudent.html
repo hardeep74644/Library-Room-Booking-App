@@ -25,13 +25,22 @@
         <!-- Booking Status Alert -->
         <div id="booking-alert" class="card"
             style="background: #fff3cd; border-left: 4px solid #ffc107; display: none;">
-            <p style="margin: 0; color: #856404;">⚠️ You have an active booking today. You cannot make another booking
-                within 24 hours.</p>
+            <p style="margin: 0; color: #856404;">⚠️ You have an active booking. You cannot make another booking
+                until you cancel your current one.</p>
         </div>
 
         <!-- Book a Room Section -->
         <div class="card">
             <h2>📅 Book a Room</h2>
+
+            <!-- Booking Hours Notice -->
+            <div
+                style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                <p style="margin: 0; color: #1565c0; font-weight: 500;">
+                    ⏰ <strong>Booking Hours:</strong> Room bookings are only available between <strong>9:00 AM - 9:00
+                        PM</strong>
+                </p>
+            </div>
 
             <!-- Room Capacity Selection -->
             <div class="form-group">
@@ -54,8 +63,8 @@
 
             <!-- Time Slot Selection -->
             <div class="form-group">
-                <label>Select Time Slot</label>
-                <input type="time" id="start-time" class="form-control">
+                <label>Select Time Slot (9:00 AM - 9:00 PM only)</label>
+                <input type="time" id="start-time" class="form-control" min="09:00" max="20:30" value="09:00">
             </div>
 
             <!-- Duration Selection -->
@@ -88,7 +97,10 @@
 
         <!-- My Bookings Section -->
         <div class="card">
-            <h2>📋 My Current Booking</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📋 My Current Bookings</h2>
+                <button onclick="refreshBookings()" class="btn-secondary">🔄 Refresh</button>
+            </div>
             <div id="my-bookings">
                 <table>
                     <thead>
@@ -103,7 +115,7 @@
                     </thead>
                     <tbody id="bookings-table">
                         <tr>
-                            <td colspan="6" style="text-align: center; color: #999;">No active bookings</td>
+                            <td colspan="6" style="text-align: center; color: #999;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>

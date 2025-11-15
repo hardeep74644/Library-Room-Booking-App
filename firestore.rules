@@ -59,8 +59,10 @@ service cloud.firestore {
       allow delete: if isSignedIn() && 
                        (request.auth.uid == resource.data.userId || isLibrarian());
       
-      // Only librarians can update bookings
-      allow update: if isLibrarian();
+      // Students can update their own bookings (for cancellation and completion), librarians can update any
+      allow update: if isLibrarian() || 
+                       (isSignedIn() && request.auth.uid == resource.data.userId && 
+                        (request.resource.data.status == 'cancelled' || request.resource.data.status == 'completed'));
     }
   }
 }

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Test</title>
+</head>
+
+<body>
+    <h1>Firebase Connection Test</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        import { auth, db } from './js/firebase-config.js';
+        import { onAuthStateChanged, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import {
+            collection,
+            getDocs,
+            query,
+            where
+        } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        const output = document.getElementById('output');
+
+        function log(message) {
+            output.innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+
+        async function testFirebase() {
+            try {
+                log('🔄 Testing Firebase connection...');
+
+                // Test basic collection read
+                const roomsRef = collection(db, 'rooms');
+                const roomsSnapshot = await getDocs(roomsRef);
+                log('✅ Rooms collection: ' + roomsSnapshot.size + ' documents');
+
+                // Test bookings collection
+                const bookingsRef = collection(db, 'bookings');
+                const bookingsSnapshot = await getDocs(bookingsRef);
+                log('✅ Bookings collection: ' + bookingsSnapshot.size + ' documents');
+
+                // List all bookings
+                bookingsSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    log('📋 Booking: ' + JSON.stringify(data));
+                });
+
+                // Test users collection
+                const usersRef = collection(db, 'users');
+                const usersSnapshot = await getDocs(usersRef);
+                log('✅ Users collection: ' + usersSnapshot.size + ' documents');
+
+            } catch (error) {
+                log('❌ Firebase test failed: ' + error.message);
+            }
+        }
+
+        // Run test
+        testFirebase();
+    </script>
+</body>
+
+</html>
