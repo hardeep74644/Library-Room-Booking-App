@@ -268,18 +268,7 @@ This system is production-ready with all debug functionality removed:
 
 ## Future Enhancements
 
-- Email notifications for booking confirmations and reminders
-- Advanced analytics dashboard for librarians
-- Mobile app development
-- Multi-location support for different library branches
-- Integration with library card systems
-- Room amenities and equipment booking
-- Multi-day booking support
-- Recurring bookings for regular events
-- Waitlist functionality for popular rooms
-- Calendar integration (Google Calendar, Outlook)
-- SMS notifications
-- Barcode/QR code check-in system
+- Email notifications for booking confirmations
 
 ## Browser Compatibility
 
