@@ -137,56 +137,214 @@ async function loadRooms() {
     }
 }
 
+// Test function to help debug filter issues
+window.testFilterFunction = async function () {
+    console.log('=== Filter Test Started ===');
+
+    const filterSelect = document.getElementById('reservation-filter');
+    if (!filterSelect) {
+        console.error('Filter dropdown not found!');
+        alert('Filter dropdown not found!');
+        return;
+    }
+
+    console.log('Current filter value:', filterSelect.value);
+    console.log('Available options:', Array.from(filterSelect.options).map(opt => opt.value));
+
+    // Test all filter options
+    const testFilters = ['all', 'active', 'cancelled', 'completed'];
+
+    for (const testFilter of testFilters) {
+        console.log(`\n--- Testing filter: ${testFilter} ---`);
+        filterSelect.value = testFilter;
+
+        try {
+            const bookingsRef = collection(db, 'bookings');
+            let q;
+
+            if (testFilter === 'all') {
+                q = query(bookingsRef);
+            } else {
+                q = query(bookingsRef, where('status', '==', testFilter));
+            }
+
+            const snapshot = await getDocs(q);
+            console.log(`Found ${snapshot.size} bookings for filter '${testFilter}'`);
+
+            if (snapshot.size > 0) {
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    console.log(`  - Booking ${doc.id}: status=${data.status}, room=${data.roomNumber}, date=${data.date}`);
+                });
+            }
+
+        } catch (error) {
+            console.error(`Error testing filter '${testFilter}':`, error);
+        }
+    }
+
+    console.log('=== Filter Test Completed ===');
+    alert('Filter test completed. Check console for results.');
+};
+
 // Load all reservations
 window.loadReservations = async function () {
     try {
         const filter = document.getElementById('reservation-filter')?.value || 'all';
+        console.log('Loading reservations with filter:', filter);
+
         const bookingsRef = collection(db, 'bookings');
-
-        let q;
-        if (filter === 'all') {
-            q = query(bookingsRef, orderBy('createdAt', 'desc'));
-        } else {
-            q = query(bookingsRef, where('status', '==', filter), orderBy('createdAt', 'desc'));
-        }
-
-        const snapshot = await getDocs(q);
         const reservationsTable = document.getElementById('reservations-table');
 
+        // Show loading state
+        reservationsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Loading reservations...</td></tr>';
+
+        let snapshot;
+
+        try {
+            let q;
+            if (filter === 'all') {
+                // Get all bookings, ordered by creation date
+                q = query(bookingsRef, orderBy('createdAt', 'desc'));
+            } else {
+                // Try the filtered query with ordering first
+                q = query(bookingsRef, where('status', '==', filter), orderBy('createdAt', 'desc'));
+            }
+
+            snapshot = await getDocs(q);
+        } catch (indexError) {
+            console.log('Index not available for filtered query, falling back to unordered query');
+
+            // Fallback: Use simpler query without ordering if index doesn't exist
+            let fallbackQuery;
+            if (filter === 'all') {
+                fallbackQuery = query(bookingsRef);
+            } else {
+                fallbackQuery = query(bookingsRef, where('status', '==', filter));
+            }
+
+            snapshot = await getDocs(fallbackQuery);
+        }
+
         if (snapshot.empty) {
-            reservationsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No reservations found</td></tr>';
+            const message = filter === 'all' ? 'No reservations found' : `No ${filter} reservations found`;
+            reservationsTable.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #999;">${message}</td></tr>`;
             return;
         }
 
-        reservationsTable.innerHTML = '';
-
+        // Convert to array for client-side sorting if needed
+        const bookings = [];
         for (const bookingDoc of snapshot.docs) {
             const booking = bookingDoc.data();
+            bookings.push({ id: bookingDoc.id, ...booking });
+        }
 
+        // Sort by creation date (newest first) on client side if Firebase ordering failed
+        bookings.sort((a, b) => {
+            if (a.createdAt && b.createdAt) {
+                return b.createdAt.toMillis() - a.createdAt.toMillis();
+            }
+            // Fallback to date comparison if createdAt is missing
+            if (a.date && b.date) {
+                return new Date(b.date) - new Date(a.date);
+            }
+            return 0;
+        });
+
+        reservationsTable.innerHTML = '';
+
+        for (const booking of bookings) {
             // Get user details
-            const userDoc = await getDoc(doc(db, 'users', booking.userId));
-            const userData = userDoc.data();
+            try {
+                const userDoc = await getDoc(doc(db, 'users', booking.userId));
+                const userData = userDoc.data();
 
-            const row = document.createElement('tr');
+                const row = document.createElement('tr');
 
-            row.innerHTML = `
-                <td>${userData?.name || 'Unknown'}</td>
-                <td>Room ${booking.roomNumber}</td>
-                <td>${booking.date}</td>
-                <td>${booking.startTime} - ${booking.endTime}</td>
-                <td><span class="status-${booking.status}">${booking.status === 'active' ? 'Active' : 'Cancelled'}</span></td>
-                <td>
-                    ${booking.status === 'active' ?
-                    `<button class="btn-danger" onclick="cancelReservation('${bookingDoc.id}')">Cancel</button>` :
-                    '<span style="color: #999;">-</span>'}
-                </td>
-            `;
+                // Determine status display
+                let statusDisplay = 'Unknown';
+                let statusClass = booking.status;
 
-            reservationsTable.appendChild(row);
+                switch (booking.status) {
+                    case 'active':
+                        statusDisplay = 'Active';
+                        break;
+                    case 'cancelled':
+                        statusDisplay = 'Cancelled';
+                        break;
+                    case 'completed':
+                        statusDisplay = 'Completed';
+                        break;
+                    default:
+                        statusDisplay = booking.status || 'Unknown';
+                }
+
+                row.innerHTML = `
+                    <td>${userData?.name || 'Unknown'}</td>
+                    <td>Room ${booking.roomNumber}</td>
+                    <td>${booking.date}</td>
+                    <td>${booking.startTime} - ${booking.endTime}</td>
+                    <td><span class="status-${statusClass}">${statusDisplay}</span></td>
+                    <td>
+                        ${booking.status === 'active' ?
+                        `<button class="btn-danger" onclick="cancelReservation('${booking.id}')">Cancel</button>` :
+                        '<span style="color: #999;">-</span>'}
+                    </td>
+                `;
+
+                reservationsTable.appendChild(row);
+            } catch (userError) {
+                console.error('Error loading user data for booking:', booking.id, userError);
+
+                // Still show the booking even if user data fails to load
+                const row = document.createElement('tr');
+
+                let statusDisplay = 'Unknown';
+                let statusClass = booking.status;
+
+                switch (booking.status) {
+                    case 'active':
+                        statusDisplay = 'Active';
+                        break;
+                    case 'cancelled':
+                        statusDisplay = 'Cancelled';
+                        break;
+                    case 'completed':
+                        statusDisplay = 'Completed';
+                        break;
+                    default:
+                        statusDisplay = booking.status || 'Unknown';
+                }
+
+                row.innerHTML = `
+                    <td>Unknown User</td>
+                    <td>Room ${booking.roomNumber}</td>
+                    <td>${booking.date}</td>
+                    <td>${booking.startTime} - ${booking.endTime}</td>
+                    <td><span class="status-${statusClass}">${statusDisplay}</span></td>
+                    <td>
+                        ${booking.status === 'active' ?
+                        `<button class="btn-danger" onclick="cancelReservation('${booking.id}')">Cancel</button>` :
+                        '<span style="color: #999;">-</span>'}
+                    </td>
+                `;
+
+                reservationsTable.appendChild(row);
+            }
         }
 
     } catch (error) {
         console.error('Error loading reservations:', error);
+
+        const reservationsTable = document.getElementById('reservations-table');
+        reservationsTable.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; color: #dc3545;">
+                    Error loading reservations: ${error.message}<br>
+                    <small>Check console for details. Try refreshing the page.</small>
+                </td>
+            </tr>
+        `;
     }
 };
 

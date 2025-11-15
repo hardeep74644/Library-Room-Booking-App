@@ -71,7 +71,7 @@ export async function login(email, password) {
 }
 
 // Register function
-export async function register(email, password, name, role = 'student') {
+export async function register(email, password, name) {
     try {
         // Create user account
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -82,16 +82,16 @@ export async function register(email, password, name, role = 'student') {
             displayName: name
         });
 
-        // Save user data to Firestore
+        // Save user data to Firestore - all new users are students
         await setDoc(doc(db, 'users', user.uid), {
             name: name,
             email: email,
-            role: role,
+            role: 'student',
             createdAt: new Date().toISOString()
         });
 
         console.log('✅ Registration successful:', user.email);
-        return { user, role };
+        return { user, role: 'student' };
     } catch (error) {
         console.error('❌ Registration error:', error);
         throw error;

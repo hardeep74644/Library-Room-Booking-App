@@ -89,11 +89,12 @@ Library-Room-Booking-App/
    - This creates 6 rooms (3 with 2-person capacity, 3 with 4-person capacity)
 
 4. **Create User Accounts**
-   - Navigate to `register.html`
-   - Create at least one student account and one librarian account
+   - Navigate to `register.html` to create student accounts
+   - Note: Only student accounts can be created through registration
+   - Librarian accounts must be created manually in Firebase Console or through existing admin users
    - Suggested test accounts:
      - Student: `student@test.com` / `student123`
-     - Librarian: `librarian@test.com` / `librarian123`
+     - Librarian: `librarian@test.com` / `librarian123` (create manually)
 
 5. **Run the Application**
    - Open `index.html` in a modern web browser
@@ -111,7 +112,7 @@ Library-Room-Booking-App/
 
 ### For Students
 
-1. **Register/Login**: Create an account or login with existing credentials
+1. **Register/Login**: Create a student account through the registration page or login with existing credentials
 2. **Search for Rooms**:
    - Select desired capacity (2 or 4 people)
    - Choose date and time
@@ -124,6 +125,8 @@ Library-Room-Booking-App/
 
 ### For Librarians
 
+**Note**: Librarian accounts cannot be created through the registration page. They must be created manually in Firebase Console or by existing admin users through the admin dashboard.
+
 1. **Login**: Use librarian credentials to access admin dashboard
 2. **Manage Rooms** (Rooms Tab):
    - View all existing rooms
@@ -134,7 +137,7 @@ Library-Room-Booking-App/
    - Cancel reservations if needed
 4. **Manage Students** (Students Tab):
    - View all registered users
-   - Change user roles between student and librarian
+   - Change user roles between student and librarian (promote students to librarians)
 
 ## Database Schema
 
@@ -167,7 +170,7 @@ Library-Room-Booking-App/
   date: string,        // YYYY-MM-DD format
   startTime: string,   // HH:MM format
   endTime: string,     // HH:MM format
-  status: 'active' | 'cancelled',
+  status: 'active' | 'cancelled' | 'completed',
   createdAt: timestamp
 }
 ```
