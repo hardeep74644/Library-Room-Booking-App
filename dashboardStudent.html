@@ -85,6 +85,23 @@
             </div>
 
             <button onclick="searchAvailableRooms()" class="btn-primary">Search Available Rooms</button>
+
+            <!-- Debug Section (can be removed in production) -->
+            <div
+                style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+                <h4>🛠️ Debug Tools</h4>
+                <button onclick="testTimeOverlap()"
+                    style="margin-right: 10px; padding: 5px 10px; background: #6c757d; color: white; border: none; border-radius: 4px;">Test
+                    Time Overlap</button>
+                <button onclick="testBookingQuery()"
+                    style="margin-right: 10px; padding: 5px 10px; background: #6c757d; color: white; border: none; border-radius: 4px;">Test
+                    Booking Queries</button>
+                <button onclick="testCurrentRoomConflicts()"
+                    style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 4px;">Test
+                    Room Conflicts</button>
+                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #666;">Check browser console (F12) for test
+                    results</p>
+            </div>
         </div>
 
         <!-- Available Rooms Section -->

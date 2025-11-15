@@ -44,12 +44,10 @@ service cloud.firestore {
     
     // Bookings collection
     match /bookings/{bookingId} {
-      // Users can read their own bookings
+      // Users can read their own bookings, librarians can read all
+      // Students can also read other bookings for conflict checking (room availability)
       allow read: if isSignedIn() && 
-                     (request.auth.uid == resource.data.userId || isLibrarian());
-      
-      // Librarians can read all bookings
-      allow read: if isLibrarian();
+                     (request.auth.uid == resource.data.userId || isLibrarian() || isStudent());
       
       // Users can create bookings for themselves
       allow create: if isSignedIn() && 

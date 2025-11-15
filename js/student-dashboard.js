@@ -301,23 +301,34 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
 
         // Check for actual booking conflicts (this is the main availability constraint now)
         try {
+            console.log(`🔍 Checking for booking conflicts on ${date} for room ${roomId}...`);
+
             const bookingsRef = collection(db, 'bookings');
-            const q = query(
+
+            // Try a simpler query first to avoid index requirements
+            let q = query(
                 bookingsRef,
                 where('roomId', '==', roomId),
-                where('date', '==', date),
-                where('status', '==', 'active')
+                where('date', '==', date)
             );
 
             const bookingsSnapshot = await getDocs(q);
+            console.log(`📋 Found ${bookingsSnapshot.size} total bookings for this room on ${date}`);
 
-            // Check for overlapping bookings
-            console.log(`🔍 Checking ${bookingsSnapshot.size} existing bookings for conflicts...`);
+            // Filter for active bookings and check overlaps manually
+            const activeBookings = [];
+            bookingsSnapshot.forEach(doc => {
+                const booking = doc.data();
+                if (booking.status === 'active') {
+                    activeBookings.push(booking);
+                }
+            });
 
-            for (const booking of bookingsSnapshot.docs) {
-                const bookingData = booking.data();
-                const bookingStart = bookingData.startTime;
-                const bookingEnd = bookingData.endTime;
+            console.log(`🔍 Checking ${activeBookings.length} active bookings for conflicts...`);
+
+            for (const booking of activeBookings) {
+                const bookingStart = booking.startTime;
+                const bookingEnd = booking.endTime;
 
                 console.log(`📋 Existing booking: ${bookingStart}-${bookingEnd} | Requested: ${startTime}-${endTime}`);
 
@@ -332,11 +343,21 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
             return true;
 
         } catch (bookingError) {
-            console.log('Error checking booking conflicts (may need Firebase index):', bookingError.message);
-            // If we can't check conflicts due to permission/index issues, assume available for now
-            // The actual booking will check for conflicts when it's created
-            console.log(`Room ${roomData.number} is available based on schedule (couldn't check conflicts)`);
-            return true;
+            console.error('❌ Error checking booking conflicts:', bookingError);
+            console.error('Error code:', bookingError.code);
+            console.error('Error message:', bookingError.message);
+
+            // Don't assume available if we can't check conflicts!
+            // This was the bug - returning true when we couldn't check
+            if (bookingError.code === 'failed-precondition') {
+                console.log('⚠️ Firebase index required for booking conflict check');
+            } else if (bookingError.code === 'permission-denied') {
+                console.log('⚠️ Permission denied for booking conflict check');
+            }
+
+            // Return false to be safe - if we can't check conflicts, don't allow booking
+            console.log(`❌ Room ${roomData.number} unavailable - cannot verify conflicts`);
+            return false;
         }
 
     } catch (error) {
@@ -376,6 +397,109 @@ window.testTimeOverlap = function () {
         const status = result === test.expected ? '✅' : '❌';
         console.log(`${status} ${test.name}: ${result} (expected: ${test.expected})`);
     });
+};
+
+// Test Firebase booking queries
+window.testBookingQuery = async function () {
+    if (!currentUser) {
+        console.log('❌ No authenticated user');
+        alert('Please login first to test booking queries');
+        return;
+    }
+
+    console.log('🧪 Testing Firebase booking queries...');
+    alert('Testing Firebase queries - check console for results');
+
+    try {
+        const bookingsRef = collection(db, 'bookings');
+
+        // Test 1: Simple query - all bookings for user
+        console.log('Test 1: All user bookings');
+        const userQuery = query(bookingsRef, where('userId', '==', currentUser.uid));
+        const userSnapshot = await getDocs(userQuery);
+        console.log(`✅ Found ${userSnapshot.size} bookings for current user`);
+
+        // Test 2: All bookings (no filter)
+        console.log('Test 2: All bookings');
+        const allSnapshot = await getDocs(bookingsRef);
+        console.log(`✅ Found ${allSnapshot.size} total bookings in system`);
+
+        // Test 3: Room and date filter (the one causing issues)
+        if (allSnapshot.size > 0) {
+            const sampleBooking = allSnapshot.docs[0].data();
+            console.log('Test 3: Room + date query with sample data:', sampleBooking);
+
+            if (sampleBooking.roomId && sampleBooking.date) {
+                const roomDateQuery = query(
+                    bookingsRef,
+                    where('roomId', '==', sampleBooking.roomId),
+                    where('date', '==', sampleBooking.date)
+                );
+                const roomDateSnapshot = await getDocs(roomDateQuery);
+                console.log(`✅ Found ${roomDateSnapshot.size} bookings for room ${sampleBooking.roomId} on ${sampleBooking.date}`);
+
+                // Test 4: Check if conflict detection would work with this data
+                console.log('Test 4: Manual conflict check simulation');
+                if (roomDateSnapshot.size > 0) {
+                    roomDateSnapshot.forEach((doc, index) => {
+                        const booking = doc.data();
+                        if (booking.status === 'active') {
+                            console.log(`Active booking ${index + 1}: ${booking.startTime}-${booking.endTime} in room ${booking.roomNumber}`);
+
+                            // Test overlap with a hypothetical new booking
+                            const testOverlap = timesOverlap('10:00', '11:00', booking.startTime, booking.endTime);
+                            console.log(`Would 10:00-11:00 conflict? ${testOverlap}`);
+                        }
+                    });
+                }
+            }
+        }
+
+        console.log('🎉 All Firebase query tests completed successfully!');
+        alert('All Firebase query tests completed - check console for details');
+
+    } catch (error) {
+        console.error('❌ Firebase query test failed:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        alert(`Firebase query test failed: ${error.message}`);
+    }
+};
+
+// Manual conflict test using current room search
+window.testCurrentRoomConflicts = async function () {
+    const date = document.getElementById('booking-date').value;
+    const startTime = document.getElementById('start-time').value;
+    const duration = document.getElementById('duration').value;
+
+    if (!date || !startTime) {
+        alert('Please select date and time first');
+        return;
+    }
+
+    const endTime = calculateEndTime(startTime, duration);
+    console.log(`🧪 Testing conflict detection for ${date} ${startTime}-${endTime}`);
+
+    try {
+        // Get rooms and test conflict detection
+        const roomsRef = collection(db, 'rooms');
+        const roomsSnapshot = await getDocs(roomsRef);
+
+        if (roomsSnapshot.size > 0) {
+            const testRoom = roomsSnapshot.docs[0];
+            const roomId = testRoom.id;
+            const roomData = testRoom.data();
+
+            console.log(`Testing with room: ${roomData.number} (ID: ${roomId})`);
+
+            const isAvailable = await checkRoomAvailability(roomId, date, startTime, endTime);
+            console.log(`✅ Room availability result: ${isAvailable}`);
+            alert(`Conflict test completed. Room ${roomData.number} is ${isAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}. Check console for details.`);
+        }
+    } catch (error) {
+        console.error('❌ Conflict test failed:', error);
+        alert(`Conflict test failed: ${error.message}`);
+    }
 };
 
 // Display available rooms
