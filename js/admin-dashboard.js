@@ -178,12 +178,48 @@ window.loadReservations = async function () {
             return;
         }
 
-        // Convert to array for client-side sorting if needed
+        // Convert to array for client-side sorting and check for expired bookings
         const bookings = [];
+        const expiredBookingIds = [];
+
         for (const bookingDoc of snapshot.docs) {
             const bookingData = bookingDoc.data();
             const booking = Booking.fromDatabaseData(bookingDoc.id, bookingData);
+
+            // Check if active booking has expired
+            if (booking.isActive() && booking.isExpired()) {
+                console.log('⏰ Admin view: Found expired booking:', booking);
+                expiredBookingIds.push({
+                    id: booking.id,
+                    bookingData: booking
+                });
+
+                // Update the booking object for immediate UI update
+                booking.complete();
+            }
+
             bookings.push(booking);
+        }
+
+        // Update expired bookings in the database
+        if (expiredBookingIds.length > 0) {
+            console.log(`🔄 Admin cleanup: Updating ${expiredBookingIds.length} expired booking(s) to completed status`);
+
+            // Update bookings in parallel
+            const updatePromises = expiredBookingIds.map(async ({ id, bookingData }) => {
+                try {
+                    await updateDoc(doc(db, 'bookings', id), {
+                        status: 'completed',
+                        completedAt: Timestamp.now()
+                    });
+                    console.log(`✅ Admin cleanup: Updated booking ${id} to completed`);
+                } catch (error) {
+                    console.error(`❌ Admin cleanup: Failed to update booking ${id}:`, error);
+                }
+            });
+
+            // Wait for all updates to complete
+            await Promise.allSettled(updatePromises);
         }
 
         // Sort by creation date (newest first) on client side if Firebase ordering failed
