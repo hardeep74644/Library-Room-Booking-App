@@ -1,5 +1,4 @@
-// Admin Dashboard functionality - v3.0 (All Day Availability)
-console.log('Admin Dashboard v3.0 loaded - All Day Availability Enabled');
+// Admin Dashboard functionality
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
@@ -658,4 +657,4 @@ window.onclick = function (event) {
     }
 };
 
-console.log('✅ Admin dashboard loaded');
+

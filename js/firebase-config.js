@@ -19,7 +19,7 @@ const app = initializeApp(firebaseConfig);
 
 // Add error handling for Firebase initialization
 try {
-  console.log('✅ Firebase app initialized successfully');
+  // Firebase app initialized successfully
 } catch (error) {
   console.error('❌ Firebase initialization failed:', error);
 }
@@ -30,12 +30,12 @@ export const db = getFirestore(app);
 
 // Add connection test
 auth.onAuthStateChanged(() => {
-    console.log('✅ Firebase Auth service ready');
+  // Firebase Auth service ready
 });
 
 // Test Firestore connection
 try {
-    console.log('✅ Firebase Firestore service ready');
+  // Firebase Firestore service ready
 } catch (error) {
-    console.error('❌ Firebase Firestore initialization failed:', error);
+  console.error('❌ Firebase Firestore initialization failed:', error);
 }

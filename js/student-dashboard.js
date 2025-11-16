@@ -1,5 +1,4 @@
-// Student Dashboard functionality - v3.0 (All Day Availability)
-console.log('Student Dashboard v3.0 loaded - All Day Availability Enabled');
+// Student Dashboard functionality
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
@@ -921,4 +920,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ Student dashboard loaded');
+
