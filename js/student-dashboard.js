@@ -18,6 +18,8 @@ import {
 import { User, Room, Booking, BookingManager } from './models.js';
 
 let currentUser = null;
+let currentUserModel = null;
+let bookingManager = new BookingManager();
 let selectedCapacity = 2;
 let selectedRoom = null;
 
@@ -28,40 +30,42 @@ onAuthStateChanged(auth, async (user) => {
         console.log('✅ User authenticated:', user.email);
 
         try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            let userData = userDoc.data();
+            // Try to load existing user from database
+            currentUserModel = await User.loadFromDatabase(user.uid);
 
-            if (!userData) {
+            if (!currentUserModel) {
                 console.log('⚠️ User document not found, creating default student profile...');
-                // If user document doesn't exist, create it with default student role
-                userData = {
-                    name: user.displayName || user.email,
-                    email: user.email,
-                    role: 'student',
-                    createdAt: new Date().toISOString()
-                };
+                // Create new User model instance with default student role
+                currentUserModel = new User(user.uid, user.email, user.displayName || user.email, 'student');
 
-                await setDoc(doc(db, 'users', user.uid), userData);
+                // Save to database
+                const success = await currentUserModel.saveToDatabase();
+                if (!success) {
+                    throw new Error('Failed to create user profile');
+                }
                 console.log('✅ Created user document with student role');
             }
 
-            console.log('👤 User data:', userData);
+            console.log('👤 User data:', currentUserModel);
 
             // Update welcome message
             const nameElement = document.querySelector('.user-info strong');
             if (nameElement) {
-                nameElement.textContent = userData?.name || user.email;
+                nameElement.textContent = currentUserModel.name;
             }
 
             // Check if user is a student
-            if (userData?.role !== 'student') {
-                console.log('❌ Access denied - user role:', userData?.role);
+            if (!currentUserModel.isStudent()) {
+                console.log('❌ Access denied - user role:', currentUserModel.role);
                 alert('Access denied. This page is for students only.');
                 window.location.href = 'admin-dashboard.html';
                 return;
             }
 
             console.log('✅ Student access confirmed, loading bookings...');
+
+            // Set user in booking manager
+            bookingManager.setUser(currentUserModel);
 
             // Load user's bookings
             loadMyBookings();
@@ -189,7 +193,7 @@ window.searchAvailableRooms = async function () {
             });
         }
 
-        displayAvailableRooms(rooms, date, startTime, endTime);
+        displayAvailableRooms(roomResults, date, startTime, endTime);
     } catch (error) {
         console.error('Error searching rooms:', error);
         alert('Error searching for rooms. Please try again.');
@@ -239,7 +243,7 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
         console.log(`Checking availability for Room ${room.number}:`, {
             requestedDate: date,
             requestedTime: `${startTime} - ${endTime}`,
-            schedule: schedule
+            schedule: room.schedule
         });
 
         if (schedule) {
@@ -291,6 +295,8 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
             console.log(`Room ${room.number} has no schedule set - please ask librarian to set availability`);
             return false;
         }
+
+        console.log(`Room ${room.number} is within available date range - checking for booking conflicts`);
 
         // Check for actual booking conflicts (this is the main availability constraint now)
         try {
@@ -429,14 +435,14 @@ async function displayAvailableRooms(rooms, date, startTime, endTime) {
 
 // Book a room
 window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) {
-    if (!currentUser) {
+    if (!currentUser || !currentUserModel) {
         alert('Please login to book a room');
         return;
     }
 
-    // Check if user already has an active booking
-    const hasActiveBooking = await checkUserActiveBooking();
-    if (hasActiveBooking) {
+    // Check if user already has an active booking using BookingManager
+    const canBook = await bookingManager.canUserMakeBooking();
+    if (!canBook) {
         alert('You already have an active booking. Please cancel it before making a new booking.');
         return;
     }
@@ -508,12 +514,12 @@ async function checkUserActiveBooking() {
 
 // Load user's bookings
 async function loadMyBookings() {
-    if (!currentUser) {
+    if (!currentUser || !currentUserModel) {
         console.log('No user authenticated');
         return;
     }
 
-    console.log('🔄 Loading bookings for user:', currentUser.uid);
+    console.log('🔄 Loading bookings for user:', currentUserModel.uid);
     const bookingsTable = document.getElementById('bookings-table');
 
     // Show loading state
@@ -526,7 +532,7 @@ async function loadMyBookings() {
         // Use simple query first to avoid index issues
         let q = query(
             bookingsRef,
-            where('userId', '==', currentUser.uid)
+            where('userId', '==', currentUserModel.uid)
         );
 
         console.log('🔍 Executing query...');
@@ -768,7 +774,7 @@ window.cancelBooking = async function (bookingId) {
 
     try {
         console.log('🔄 Attempting to cancel booking:', bookingId);
-        console.log('👤 Current user:', currentUser?.uid);
+        console.log('👤 Current user:', currentUserModel?.uid);
 
         // Load booking and cancel using Booking model
         const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
@@ -781,9 +787,19 @@ window.cancelBooking = async function (bookingId) {
         booking.cancel();
         await booking.saveToDatabase();
 
-        console.log('✅ Booking cancelled successfully');
-        alert('Booking cancelled successfully');
-        loadMyBookings();
+        const booking = Booking.fromDatabaseData(bookingId, bookingDoc.data());
+
+        // Cancel the booking using the model method
+        if (booking.cancel()) {
+            // Save the updated booking to database
+            await booking.saveToDatabase();
+
+            console.log('✅ Booking cancelled successfully');
+            alert('Booking cancelled successfully');
+            loadMyBookings();
+        } else {
+            throw new Error('Unable to cancel this booking');
+        }
     } catch (error) {
         console.error('❌ Error cancelling booking:', error);
         console.error('Error code:', error.code);
@@ -800,7 +816,7 @@ window.cancelBooking = async function (bookingId) {
 // Refresh bookings manually
 window.refreshBookings = function () {
     console.log('🔄 Manual refresh requested');
-    if (!currentUser) {
+    if (!currentUser || !currentUserModel) {
         console.log('❌ No authenticated user');
         alert('Please login first');
         return;
@@ -815,7 +831,7 @@ window.refreshBookings = function () {
 // Refresh booking history manually
 window.refreshBookingHistory = function () {
     console.log('🔄 Manual booking history refresh requested');
-    if (!currentUser) {
+    if (!currentUser || !currentUserModel) {
         console.log('❌ No authenticated user');
         alert('Please login first');
         return;

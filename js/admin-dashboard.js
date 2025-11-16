@@ -18,6 +18,7 @@ import {
 import { User, Room, Booking } from './models.js';
 
 let currentUser = null;
+let currentUserModel = null;
 
 // Check authentication
 onAuthStateChanged(auth, async (user) => {
@@ -25,17 +26,14 @@ onAuthStateChanged(auth, async (user) => {
         currentUser = user;
 
         try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            const userData = userDoc.data();
+            // Try to load existing user from database
+            currentUserModel = await User.loadFromDatabase(user.uid);
 
-            if (!userData) {
-                // If user document doesn't exist, create it with default role
-                await setDoc(doc(db, 'users', user.uid), {
-                    name: user.displayName || user.email,
-                    email: user.email,
-                    role: 'student', // Default to student, admin can change later
-                    createdAt: new Date().toISOString()
-                });
+            if (!currentUserModel) {
+                // Create new User model instance with default student role
+                currentUserModel = new User(user.uid, user.email, user.displayName || user.email, 'student');
+                await currentUserModel.saveToDatabase();
+
                 alert('This account is not set up as a librarian. Please contact an administrator.');
                 window.location.href = 'dashboardStudent.html';
                 return;
@@ -44,11 +42,11 @@ onAuthStateChanged(auth, async (user) => {
             // Update welcome message
             const nameElement = document.querySelector('.user-info strong');
             if (nameElement) {
-                nameElement.textContent = userData?.name || user.email;
+                nameElement.textContent = currentUserModel.name;
             }
 
             // Check if user is a librarian
-            if (userData?.role !== 'librarian') {
+            if (!currentUserModel.isLibrarian()) {
                 alert('Access denied. This page is for librarians only.');
                 window.location.href = 'dashboardStudent.html';
                 return;
@@ -182,8 +180,9 @@ window.loadReservations = async function () {
         // Convert to array for client-side sorting if needed
         const bookings = [];
         for (const bookingDoc of snapshot.docs) {
-            const booking = bookingDoc.data();
-            bookings.push({ id: bookingDoc.id, ...booking });
+            const bookingData = bookingDoc.data();
+            const booking = Booking.fromDatabaseData(bookingDoc.id, bookingData);
+            bookings.push(booking);
         }
 
         // Sort by creation date (newest first) on client side if Firebase ordering failed
@@ -208,6 +207,7 @@ window.loadReservations = async function () {
             try {
                 const userDoc = await getDoc(doc(db, 'users', booking.userId));
                 const userData = userDoc.data();
+                const user = userData ? User.fromDatabaseData(booking.userId, userData) : null;
 
                 const row = document.createElement('tr');
 
@@ -230,7 +230,7 @@ window.loadReservations = async function () {
                 }
 
                 row.innerHTML = `
-                    <td>${userData?.name || 'Unknown'}</td>
+                    <td>${user?.name || 'Unknown'}</td>
                     <td>Room ${booking.roomNumber}</td>
                     <td>${booking.date}</td>
                     <td>${booking.startTime} - ${booking.endTime}</td>
@@ -313,19 +313,20 @@ async function loadStudents() {
         studentsTable.innerHTML = '';
 
         snapshot.forEach(doc => {
-            const user = doc.data();
+            const userData = doc.data();
+            const user = User.fromDatabaseData(doc.id, userData);
             const isCurrentUser = currentUser && currentUser.uid === doc.id;
             const row = document.createElement('tr');
 
             row.innerHTML = `
                 <td>${user.name}</td>
                 <td>${user.email}</td>
-                <td><span style="padding: 4px 12px; background: ${user.role === 'librarian' ? '#d4edda' : '#cce5ff'}; border-radius: 12px; font-size: 0.85rem;">${user.role}</span></td>
+                <td><span style="padding: 4px 12px; background: ${user.isLibrarian() ? '#d4edda' : '#cce5ff'}; border-radius: 12px; font-size: 0.85rem;">${user.role}</span></td>
                 <td>${new Date(user.createdAt).toLocaleDateString()}</td>
                 <td>
                     ${isCurrentUser ?
                     '<span style="color: #999; font-style: italic;">Current User</span>' :
-                    `<button class="btn-danger" onclick="deleteUser('${doc.id}', '${user.name}', '${user.email}')">Delete User</button>`}
+                    `<button class="btn-danger" onclick="deleteUser('${user.uid}', '${user.name}', '${user.email}')">Delete User</button>`}
                 </td>
             `;
 
@@ -500,9 +501,20 @@ window.clearRoomSchedule = async function () {
     }
 
     try {
-        await updateDoc(doc(db, 'rooms', window.currentScheduleRoomId), {
-            schedule: null
-        });
+        // Load room and clear its schedule
+        const room = await Room.loadFromDatabase(window.currentScheduleRoomId);
+        if (!room) {
+            throw new Error('Room not found');
+        }
+
+        // Clear the schedule
+        room.schedule = null;
+
+        // Save to database
+        const success = await room.saveToDatabase();
+        if (!success) {
+            throw new Error('Failed to clear room schedule');
+        }
 
         alert('Room schedule cleared successfully!');
         closeRoomScheduleModal();
@@ -520,7 +532,7 @@ window.deleteRoom = async function (roomId, roomNumber) {
     }
 
     try {
-        // Check if room has any active bookings
+        // Check if room has any active bookings using Booking model
         const bookingsRef = collection(db, 'bookings');
         const q = query(
             bookingsRef,
@@ -534,6 +546,7 @@ window.deleteRoom = async function (roomId, roomNumber) {
             return;
         }
 
+        // Delete the room
         await deleteDoc(doc(db, 'rooms', roomId));
         alert('Room deleted successfully!');
         loadRooms();
@@ -550,9 +563,24 @@ window.cancelReservation = async function (bookingId) {
     }
 
     try {
-        await deleteDoc(doc(db, 'bookings', bookingId));
-        alert('Reservation cancelled successfully!');
-        loadReservations();
+        // Load the booking and cancel it using the model method
+        const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
+        if (!bookingDoc.exists()) {
+            throw new Error('Booking not found');
+        }
+
+        const booking = Booking.fromDatabaseData(bookingId, bookingDoc.data());
+
+        // Cancel the booking using the model method
+        if (booking.cancel()) {
+            // Save the updated booking to database
+            await booking.saveToDatabase();
+
+            alert('Reservation cancelled successfully!');
+            loadReservations();
+        } else {
+            throw new Error('Unable to cancel this reservation');
+        }
     } catch (error) {
         console.error('Error cancelling reservation:', error);
         alert('Failed to cancel reservation. Please try again.');

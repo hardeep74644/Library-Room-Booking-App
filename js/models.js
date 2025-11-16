@@ -6,7 +6,7 @@ import { db } from './firebase-config.js';
 /**
  * User class - Encapsulates user data and authentication-related methods
  */
-export class User {
+class User {
     constructor(uid, email, name = null, role = 'student') {
         this.uid = uid;
         this.email = email;
@@ -85,7 +85,7 @@ export class User {
 /**
  * Room class - Encapsulates room data and availability checking
  */
-export class Room {
+class Room {
     constructor(id, number, capacity, floor) {
         this.id = id;
         this.number = number;
@@ -204,7 +204,7 @@ export class Room {
 /**
  * Booking class - Encapsulates booking data and operations
  */
-export class Booking {
+class Booking {
     constructor(userId, roomId, roomNumber, date, startTime, endTime) {
         this.id = null;
         this.userId = userId;
@@ -395,7 +395,7 @@ export class Booking {
 /**
  * BookingManager class - Coordinates booking operations between User, Room, and Booking classes
  */
-export class BookingManager {
+class BookingManager {
     constructor() {
         this.user = null;
         this.rooms = [];
