@@ -15,8 +15,11 @@ import {
     Timestamp,
     orderBy
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { User, Room, Booking, BookingManager } from './models.js';
 
 let currentUser = null;
+let currentUserModel = null;
+let bookingManager = new BookingManager();
 let selectedCapacity = 2;
 let selectedRoom = null;
 
@@ -27,40 +30,42 @@ onAuthStateChanged(auth, async (user) => {
         console.log('✅ User authenticated:', user.email);
 
         try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            let userData = userDoc.data();
+            // Try to load existing user from database
+            currentUserModel = await User.loadFromDatabase(user.uid);
 
-            if (!userData) {
+            if (!currentUserModel) {
                 console.log('⚠️ User document not found, creating default student profile...');
-                // If user document doesn't exist, create it with default student role
-                userData = {
-                    name: user.displayName || user.email,
-                    email: user.email,
-                    role: 'student',
-                    createdAt: new Date().toISOString()
-                };
+                // Create new User model instance with default student role
+                currentUserModel = new User(user.uid, user.email, user.displayName || user.email, 'student');
 
-                await setDoc(doc(db, 'users', user.uid), userData);
+                // Save to database
+                const success = await currentUserModel.saveToDatabase();
+                if (!success) {
+                    throw new Error('Failed to create user profile');
+                }
                 console.log('✅ Created user document with student role');
             }
 
-            console.log('👤 User data:', userData);
+            console.log('👤 User data:', currentUserModel);
 
             // Update welcome message
             const nameElement = document.querySelector('.user-info strong');
             if (nameElement) {
-                nameElement.textContent = userData?.name || user.email;
+                nameElement.textContent = currentUserModel.name;
             }
 
             // Check if user is a student
-            if (userData?.role !== 'student') {
-                console.log('❌ Access denied - user role:', userData?.role);
+            if (!currentUserModel.isStudent()) {
+                console.log('❌ Access denied - user role:', currentUserModel.role);
                 alert('Access denied. This page is for students only.');
                 window.location.href = 'admin-dashboard.html';
                 return;
             }
 
             console.log('✅ Student access confirmed, loading bookings...');
+
+            // Set user in booking manager
+            bookingManager.setUser(currentUserModel);
 
             // Load user's bookings
             loadMyBookings();
@@ -166,35 +171,29 @@ window.searchAvailableRooms = async function () {
         // Calculate end time based on duration
         const endTime = calculateEndTime(startTime, duration);
 
-        // Get all rooms with matching capacity
-        const roomsRef = collection(db, 'rooms');
-        let q = query(roomsRef, where('capacity', '==', selectedCapacity));
+        // Get all rooms with matching capacity using Room model
+        const rooms = await Room.getRoomsByCapacity(selectedCapacity);
+        const roomResults = [];
 
-        const roomsSnapshot = await getDocs(q);
-        const rooms = [];
-
-        for (const roomDoc of roomsSnapshot.docs) {
-            const roomData = roomDoc.data();
-            const roomId = roomDoc.id;
-
+        for (const room of rooms) {
             // Check if room number matches search (if provided)
-            if (roomSearch && !roomData.number.toLowerCase().includes(roomSearch.toLowerCase())) {
+            if (roomSearch && !room.number.toLowerCase().includes(roomSearch.toLowerCase())) {
                 continue;
             }
 
             // Check availability
-            const isAvailable = await checkRoomAvailability(roomId, date, startTime, endTime);
+            const isAvailable = await checkRoomAvailability(room.id, date, startTime, endTime);
 
-            rooms.push({
-                id: roomId,
-                number: roomData.number,
-                capacity: roomData.capacity,
-                floor: roomData.floor,
+            roomResults.push({
+                id: room.id,
+                number: room.number,
+                capacity: room.capacity,
+                floor: room.floor,
                 available: isAvailable
             });
         }
 
-        displayAvailableRooms(rooms, date, startTime, endTime);
+        displayAvailableRooms(roomResults, date, startTime, endTime);
     } catch (error) {
         console.error('Error searching rooms:', error);
         alert('Error searching for rooms. Please try again.');
@@ -231,72 +230,27 @@ function calculateEndTime(startTime, duration) {
 // Check if room is available at the specified time
 async function checkRoomAvailability(roomId, date, startTime, endTime) {
     try {
-        // First check if the room has a schedule and if the requested time fits
-        const roomDoc = await getDoc(doc(db, 'rooms', roomId));
+        // Load room using Room model
+        const room = await Room.loadFromDatabase(roomId);
 
-        if (!roomDoc.exists()) {
+        if (!room) {
             console.log(`Room with ID ${roomId} not found`);
             return false;
         }
 
-        const roomData = roomDoc.data();
-        const schedule = roomData.schedule;
-
-        console.log(`Checking availability for Room ${roomData.number}:`, {
+        console.log(`Checking availability for Room ${room.number}:`, {
             requestedDate: date,
             requestedTime: `${startTime} - ${endTime}`,
-            schedule: schedule
+            schedule: room.schedule
         });
 
-        if (schedule) {
-            // Check if schedule has the new date range format
-            if (!schedule.startDate || !schedule.endDate) {
-                console.log(`Room ${roomData.number} has old schedule format or missing date range:`, schedule);
-                return false;
-            }
-
-            // Check if the requested date is within the available date range
-            const requestedDate = new Date(date);
-            const scheduleStartDate = new Date(schedule.startDate);
-            const scheduleEndDate = new Date(schedule.endDate);
-
-            // Ensure all dates are valid
-            if (isNaN(requestedDate.getTime()) || isNaN(scheduleStartDate.getTime()) || isNaN(scheduleEndDate.getTime())) {
-                console.log(`Room ${roomData.number} has invalid date format:`, {
-                    requestedDate: date,
-                    scheduleStartDate: schedule.startDate,
-                    scheduleEndDate: schedule.endDate
-                });
-                return false;
-            }
-
-            console.log(`Date comparison for Room ${roomData.number}:`, {
-                requestedDate: requestedDate.toDateString(),
-                scheduleStartDate: scheduleStartDate.toDateString(),
-                scheduleEndDate: scheduleEndDate.toDateString(),
-                requestedDateISO: requestedDate.toISOString(),
-                scheduleStartDateISO: scheduleStartDate.toISOString(),
-                scheduleEndDateISO: scheduleEndDate.toISOString(),
-                withinRange: requestedDate >= scheduleStartDate && requestedDate <= scheduleEndDate
-            });
-
-            // Use date comparison (not time comparison)
-            const requestedDateOnly = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate());
-            const startDateOnly = new Date(scheduleStartDate.getFullYear(), scheduleStartDate.getMonth(), scheduleStartDate.getDate());
-            const endDateOnly = new Date(scheduleEndDate.getFullYear(), scheduleEndDate.getMonth(), scheduleEndDate.getDate());
-
-            if (requestedDateOnly < startDateOnly || requestedDateOnly > endDateOnly) {
-                console.log(`Room ${roomData.number} not available on ${date} (available from ${schedule.startDate} to ${schedule.endDate})`);
-                return false;
-            }
-
-            // Rooms are available all day within the date range - no time restrictions from schedule
-            console.log(`Room ${roomData.number} is within available date range - checking for booking conflicts`);
-        } else {
-            // If no schedule is set, room is not available
-            console.log(`Room ${roomData.number} has no schedule set - please ask librarian to set availability`);
+        // Check if room is available on the requested date using Room model method
+        if (!room.isAvailableOnDate(date)) {
+            console.log(`Room ${room.number} not available on ${date}`);
             return false;
         }
+
+        console.log(`Room ${room.number} is within available date range - checking for booking conflicts`);
 
         // Check for actual booking conflicts (this is the main availability constraint now)
         try {
@@ -332,13 +286,13 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
                 console.log(`📋 Existing booking: ${bookingStart}-${bookingEnd} | Requested: ${startTime}-${endTime}`);
 
                 // Check if times overlap
-                if (timesOverlap(startTime, endTime, bookingStart, bookingEnd)) {
-                    console.log(`❌ Room ${roomData.number} has conflicting booking: ${bookingStart}-${bookingEnd}`);
+                if (Booking.checkTimeOverlap(startTime, endTime, bookingStart, bookingEnd)) {
+                    console.log(`❌ Room ${room.number} has conflicting booking: ${bookingStart}-${bookingEnd}`);
                     return false;
                 }
             }
 
-            console.log(`Room ${roomData.number} is available - no conflicts found`);
+            console.log(`Room ${room.number} is available - no conflicts found`);
             return true;
 
         } catch (bookingError) {
@@ -355,7 +309,7 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
             }
 
             // Return false to be safe - if we can't check conflicts, don't allow booking
-            console.log(`❌ Room ${roomData.number} unavailable - cannot verify conflicts`);
+            console.log(`❌ Room ${room.number} unavailable - cannot verify conflicts`);
             return false;
         }
 
@@ -445,14 +399,14 @@ async function displayAvailableRooms(rooms, date, startTime, endTime) {
 
 // Book a room
 window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) {
-    if (!currentUser) {
+    if (!currentUser || !currentUserModel) {
         alert('Please login to book a room');
         return;
     }
 
-    // Check if user already has an active booking
-    const hasActiveBooking = await checkUserActiveBooking();
-    if (hasActiveBooking) {
+    // Check if user already has an active booking using BookingManager
+    const canBook = await bookingManager.canUserMakeBooking();
+    if (!canBook) {
         alert('You already have an active booking. Please cancel it before making a new booking.');
         return;
     }
@@ -476,17 +430,8 @@ window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) 
 
         console.log('✅ Room still available, proceeding with booking...');
 
-        // Create booking
-        await addDoc(collection(db, 'bookings'), {
-            userId: currentUser.uid,
-            roomId: roomId,
-            roomNumber: roomNumber,
-            date: date,
-            startTime: startTime,
-            endTime: endTime,
-            status: 'active',
-            createdAt: Timestamp.now()
-        });
+        // Create booking using BookingManager
+        const booking = await bookingManager.createBooking(roomId, roomNumber, date, startTime, endTime);
 
         alert('Room booked successfully!');
 
@@ -522,15 +467,10 @@ window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) 
 // Check if user has an active booking
 async function checkUserActiveBooking() {
     try {
-        const bookingsRef = collection(db, 'bookings');
-        const q = query(
-            bookingsRef,
-            where('userId', '==', currentUser.uid),
-            where('status', '==', 'active')
-        );
+        if (!currentUserModel) return false;
 
-        const snapshot = await getDocs(q);
-        return !snapshot.empty;
+        const activeBookings = await Booking.getUserActiveBookings(currentUserModel.uid);
+        return activeBookings.length > 0;
     } catch (error) {
         console.error('Error checking active booking:', error);
         return false;
@@ -539,12 +479,12 @@ async function checkUserActiveBooking() {
 
 // Load user's bookings
 async function loadMyBookings() {
-    if (!currentUser) {
+    if (!currentUser || !currentUserModel) {
         console.log('No user authenticated');
         return;
     }
 
-    console.log('🔄 Loading bookings for user:', currentUser.uid);
+    console.log('🔄 Loading bookings for user:', currentUserModel.uid);
     const bookingsTable = document.getElementById('bookings-table');
 
     // Show loading state
@@ -557,7 +497,7 @@ async function loadMyBookings() {
         // Use simple query first to avoid index issues
         let q = query(
             bookingsRef,
-            where('userId', '==', currentUser.uid)
+            where('userId', '==', currentUserModel.uid)
         );
 
         console.log('🔍 Executing query...');
@@ -580,31 +520,26 @@ async function loadMyBookings() {
         const expiredBookingIds = [];
 
         for (const docSnapshot of snapshot.docs) {
-            const booking = docSnapshot.data();
-            const bookingWithId = { ...booking, id: docSnapshot.id };
+            const bookingData = docSnapshot.data();
+            const booking = Booking.fromDatabaseData(docSnapshot.id, bookingData);
 
             // Check if active booking has expired
-            if (booking.status === 'active' && booking.date && booking.endTime) {
-                const bookingDateTime = new Date(`${booking.date}T${booking.endTime}:00`);
+            if (booking.isActive() && booking.isExpired()) {
+                console.log('⏰ Found expired booking:', booking);
+                expiredBookingIds.push({
+                    id: booking.id,
+                    bookingData: booking
+                });
 
-                if (bookingDateTime < now) {
-                    console.log('⏰ Found expired booking:', bookingWithId);
-                    expiredBookingIds.push({
-                        id: bookingWithId.id,
-                        bookingData: bookingWithId
-                    });
-
-                    // Update the booking object for immediate UI update
-                    bookingWithId.status = 'completed';
-                    bookingWithId.completedAt = Timestamp.now();
-                }
+                // Update the booking object for immediate UI update
+                booking.complete();
             }
 
-            console.log('📋 Processing booking:', bookingWithId);
-            allBookings.push(bookingWithId);
+            console.log('📋 Processing booking:', booking);
+            allBookings.push(booking);
 
-            if (bookingWithId.status === 'active') {
-                activeBookings.push(bookingWithId);
+            if (booking.isActive()) {
+                activeBookings.push(booking);
             }
         }
 
@@ -658,7 +593,7 @@ async function loadMyBookings() {
                 <td>Room ${booking.roomNumber || 'N/A'}</td>
                 <td>${booking.date || 'N/A'}</td>
                 <td>${booking.startTime || 'N/A'} - ${booking.endTime || 'N/A'}</td>
-                <td>${booking.startTime && booking.endTime ? calculateDuration(booking.startTime, booking.endTime) : 'N/A'}</td>
+                <td>${booking.getFormattedDuration()}</td>
                 <td><span class="status-active">Active</span></td>
                 <td><button class="btn-danger" onclick="cancelBooking('${booking.id}')">Cancel</button></td>
             `;
@@ -757,7 +692,7 @@ function showBookingHistory(allBookings) {
             statusText = 'Cancelled';
             cancellationDate = booking.cancelledAt ?
                 new Date(booking.cancelledAt.toMillis()).toLocaleDateString() : 'N/A';
-        } else if (booking.status === 'active') {
+        } else if (booking.isActive()) {
             statusText = 'Active';
             cancellationDate = 'N/A';
         } else if (booking.status === 'completed') {
@@ -770,7 +705,7 @@ function showBookingHistory(allBookings) {
             <td>Room ${booking.roomNumber || 'N/A'}</td>
             <td>${booking.date || 'N/A'}</td>
             <td>${booking.startTime || 'N/A'} - ${booking.endTime || 'N/A'}</td>
-            <td>${booking.startTime && booking.endTime ? calculateDuration(booking.startTime, booking.endTime) : 'N/A'}</td>
+            <td>${booking.getFormattedDuration()}</td>
             <td><span class="${statusClass}">${statusText}</span></td>
             <td>${createdAt}</td>
             <td>${cancellationDate}</td>
@@ -805,17 +740,27 @@ window.cancelBooking = async function (bookingId) {
 
     try {
         console.log('🔄 Attempting to cancel booking:', bookingId);
-        console.log('👤 Current user:', currentUser?.uid);
+        console.log('👤 Current user:', currentUserModel?.uid);
 
-        // Update the booking status to 'cancelled' instead of deleting
-        await updateDoc(doc(db, 'bookings', bookingId), {
-            status: 'cancelled',
-            cancelledAt: Timestamp.now()
-        });
+        // Load the booking and cancel it using the model method
+        const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
+        if (!bookingDoc.exists()) {
+            throw new Error('Booking not found');
+        }
 
-        console.log('✅ Booking cancelled successfully');
-        alert('Booking cancelled successfully');
-        loadMyBookings();
+        const booking = Booking.fromDatabaseData(bookingId, bookingDoc.data());
+
+        // Cancel the booking using the model method
+        if (booking.cancel()) {
+            // Save the updated booking to database
+            await booking.saveToDatabase();
+
+            console.log('✅ Booking cancelled successfully');
+            alert('Booking cancelled successfully');
+            loadMyBookings();
+        } else {
+            throw new Error('Unable to cancel this booking');
+        }
     } catch (error) {
         console.error('❌ Error cancelling booking:', error);
         console.error('Error code:', error.code);
@@ -832,7 +777,7 @@ window.cancelBooking = async function (bookingId) {
 // Refresh bookings manually
 window.refreshBookings = function () {
     console.log('🔄 Manual refresh requested');
-    if (!currentUser) {
+    if (!currentUser || !currentUserModel) {
         console.log('❌ No authenticated user');
         alert('Please login first');
         return;
@@ -847,7 +792,7 @@ window.refreshBookings = function () {
 // Refresh booking history manually
 window.refreshBookingHistory = function () {
     console.log('🔄 Manual booking history refresh requested');
-    if (!currentUser) {
+    if (!currentUser || !currentUserModel) {
         console.log('❌ No authenticated user');
         alert('Please login first');
         return;
