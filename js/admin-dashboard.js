@@ -15,6 +15,7 @@ import {
     orderBy,
     Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { User, Room, Booking } from './models.js';
 
 let currentUser = null;
 
@@ -102,8 +103,8 @@ async function loadRooms() {
         roomsTable.innerHTML = '';
         console.log(`Found ${snapshot.size} rooms`);
 
-        snapshot.forEach(doc => {
-            const room = doc.data();
+        snapshot.forEach(docSnapshot => {
+            const room = Room.fromDatabaseData(docSnapshot.id, docSnapshot.data());
             const schedule = room.schedule || {};
 
             const availableDates = schedule.startDate && schedule.endDate
@@ -121,8 +122,8 @@ async function loadRooms() {
                 <td><span style="font-size: 0.9em;">${availableDates}</span></td>
                 <td><span class="available-badge available">Active</span></td>
                 <td>
-                    <button class="btn-secondary" onclick="showRoomScheduleModal('${doc.id}', '${room.number}')" style="margin-right: 5px; font-size: 0.85em;">Schedule</button>
-                    <button class="btn-danger" onclick="deleteRoom('${doc.id}', '${room.number}')" style="font-size: 0.85em;">Delete</button>
+                    <button class="btn-secondary" onclick="showRoomScheduleModal('${room.id}', '${room.number}')" style="margin-right: 5px; font-size: 0.85em;">Schedule</button>
+                    <button class="btn-danger" onclick="deleteRoom('${room.id}', '${room.number}')" style="font-size: 0.85em;">Delete</button>
                 </td>
             `;
 
@@ -199,7 +200,10 @@ window.loadReservations = async function () {
 
         reservationsTable.innerHTML = '';
 
-        for (const booking of bookings) {
+        for (const bookingData of bookings) {
+            // Convert to Booking model
+            const booking = Booking.fromDatabaseData(bookingData.id, bookingData);
+            
             // Get user details
             try {
                 const userDoc = await getDoc(doc(db, 'users', booking.userId));
@@ -232,7 +236,7 @@ window.loadReservations = async function () {
                     <td>${booking.startTime} - ${booking.endTime}</td>
                     <td><span class="status-${statusClass}">${statusDisplay}</span></td>
                     <td>
-                        ${booking.status === 'active' ?
+                        ${booking.isActive() ?
                         `<button class="btn-danger" onclick="cancelReservation('${booking.id}')">Cancel</button>` :
                         '<span style="color: #999;">-</span>'}
                     </td>
@@ -269,7 +273,7 @@ window.loadReservations = async function () {
                     <td>${booking.startTime} - ${booking.endTime}</td>
                     <td><span class="status-${statusClass}">${statusDisplay}</span></td>
                     <td>
-                        ${booking.status === 'active' ?
+                        ${booking.isActive() ?
                         `<button class="btn-danger" onclick="cancelReservation('${booking.id}')">Cancel</button>` :
                         '<span style="color: #999;">-</span>'}
                     </td>
@@ -419,13 +423,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Add room
-                await addDoc(collection(db, 'rooms'), {
-                    number: roomNumber,
-                    floor: floor,
-                    capacity: capacity,
-                    createdAt: Timestamp.now()
-                });
+                // Add room using Room model
+                const newRoom = new Room(null, roomNumber, capacity, floor);
+                await newRoom.saveToDatabase();
 
                 alert('Room added successfully!');
                 closeAddRoomModal();
@@ -467,16 +467,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Update room with schedule (no time restrictions - available all day)
-                await updateDoc(doc(db, 'rooms', window.currentScheduleRoomId), {
-                    schedule: {
-                        startDate: startDate,
-                        endDate: endDate,
-                        // No time restrictions - rooms are available all day
-                        allDay: true,
-                        updatedAt: Timestamp.now()
-                    }
-                });
+                // Load room and update schedule using Room model
+                const room = await Room.loadFromDatabase(window.currentScheduleRoomId);
+                if (!room) {
+                    alert('Room not found');
+                    return;
+                }
+                
+                room.setSchedule(startDate, endDate);
+                await room.saveToDatabase();
 
                 alert('Room schedule updated successfully!');
                 closeRoomScheduleModal();
