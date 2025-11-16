@@ -1,5 +1,7 @@
 // Student Dashboard functionality
 import { auth, db } from './firebase-config.js';
+import { User, Room, Booking, BookingManager } from './models.js';
+import { TimeUtils, DateUtils, UIUtils, ValidationUtils, ErrorUtils } from './utils.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
     collection,
@@ -27,33 +29,23 @@ onAuthStateChanged(auth, async (user) => {
         console.log('✅ User authenticated:', user.email);
 
         try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            let userData = userDoc.data();
+            let userData = await User.loadFromDatabase(user.uid);
 
             if (!userData) {
                 console.log('⚠️ User document not found, creating default student profile...');
                 // If user document doesn't exist, create it with default student role
-                userData = {
-                    name: user.displayName || user.email,
-                    email: user.email,
-                    role: 'student',
-                    createdAt: new Date().toISOString()
-                };
-
-                await setDoc(doc(db, 'users', user.uid), userData);
+                userData = new User(user.uid, user.email, user.displayName || user.email, 'student');
+                await userData.saveToDatabase();
                 console.log('✅ Created user document with student role');
             }
 
             console.log('👤 User data:', userData);
 
             // Update welcome message
-            const nameElement = document.querySelector('.user-info strong');
-            if (nameElement) {
-                nameElement.textContent = userData?.name || user.email;
-            }
+            UIUtils.updateWelcomeMessage(userData, user.email);
 
             // Check if user is a student
-            if (userData?.role !== 'student') {
+            if (!userData.isStudent()) {
                 console.log('❌ Access denied - user role:', userData?.role);
                 alert('Access denied. This page is for students only.');
                 window.location.href = 'admin-dashboard.html';
@@ -92,7 +84,7 @@ onAuthStateChanged(auth, async (user) => {
 
 // Set minimum date for booking to today
 function setMinimumBookingDate() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = DateUtils.getTodayDate();
     const bookingDateInput = document.getElementById('booking-date');
     if (bookingDateInput) {
         bookingDateInput.min = today;
@@ -124,49 +116,22 @@ window.searchAvailableRooms = async function () {
     }
 
     // Validate date is not in the past
-    const selectedDate = new Date(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (selectedDate < today) {
+    if (DateUtils.isPastDate(date)) {
         alert('Cannot book rooms for past dates');
         return;
     }
 
     // Check if booking time is within allowed hours (9am - 9pm)
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const startMinutes = hours * 60 + minutes;
-    const endTime = calculateEndTime(startTime, duration);
-    const [endHours, endMinutes] = endTime.split(':').map(Number);
-    const endMinutesTotal = endHours * 60 + endMinutes;
+    const endTime = TimeUtils.calculateEndTime(startTime, duration);
 
-    // 9:00 AM = 9 * 60 = 540 minutes
-    // 9:00 PM = 21 * 60 = 1260 minutes
-    const allowedStartTime = 9 * 60; // 9:00 AM
-    const allowedEndTime = 21 * 60;  // 9:00 PM
-
-    if (startMinutes < allowedStartTime || endMinutesTotal > allowedEndTime) {
-        let message = '⏰ Room booking is only available between 9:00 AM and 9:00 PM.\n\n';
-
-        if (startMinutes < allowedStartTime) {
-            message += `• Your selected start time (${startTime}) is before 9:00 AM\n`;
-        }
-
-        if (endMinutesTotal > allowedEndTime) {
-            message += `• Your booking would end at ${endTime}, which is after 9:00 PM\n`;
-        }
-
-        message += '\nPlease select a different time slot within the allowed hours.';
-
-        alert(message);
+    if (!TimeUtils.validateBookingHours(startTime, endTime)) {
+        alert(TimeUtils.getBookingHoursMessage(startTime, endTime));
         return;
     }
 
     try {
-        // Calculate end time based on duration
-        const endTime = calculateEndTime(startTime, duration);
-
-        // Get all rooms with matching capacity
+        // Calculate end time using TimeUtils
+        const endTime = TimeUtils.calculateEndTime(startTime, duration);
         const roomsRef = collection(db, 'rooms');
         let q = query(roomsRef, where('capacity', '==', selectedCapacity));
 
@@ -201,31 +166,7 @@ window.searchAvailableRooms = async function () {
     }
 };
 
-// Calculate end time based on start time and duration
-function calculateEndTime(startTime, duration) {
-    const [hours, minutes] = startTime.split(':').map(Number);
-    let totalMinutes = hours * 60 + minutes;
-
-    switch (duration) {
-        case '30min':
-            totalMinutes += 30;
-            break;
-        case '1hr':
-            totalMinutes += 60;
-            break;
-        case '1.5hr':
-            totalMinutes += 90;
-            break;
-        case '2hr':
-            totalMinutes += 120;
-            break;
-    }
-
-    const endHours = Math.floor(totalMinutes / 60);
-    const endMinutes = totalMinutes % 60;
-
-    return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
-}
+// Time calculation functions moved to utils.js
 
 // Check if room is available at the specified time
 // Check if room is available at the specified time
@@ -332,7 +273,7 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
                 console.log(`📋 Existing booking: ${bookingStart}-${bookingEnd} | Requested: ${startTime}-${endTime}`);
 
                 // Check if times overlap
-                if (timesOverlap(startTime, endTime, bookingStart, bookingEnd)) {
+                if (Booking.checkTimeOverlap(startTime, endTime, bookingStart, bookingEnd)) {
                     console.log(`❌ Room ${roomData.number} has conflicting booking: ${bookingStart}-${bookingEnd}`);
                     return false;
                 }
@@ -364,16 +305,6 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
         console.log('Availability check failed due to permissions or other error');
         return false;
     }
-}
-
-// Check if two time ranges overlap
-function timesOverlap(start1, end1, start2, end2) {
-    // Convert times to comparable format for debugging
-    const overlap = (start1 < end2 && end1 > start2);
-
-    console.log(`⏰ Time overlap check: (${start1}-${end1}) vs (${start2}-${end2}) = ${overlap}`);
-
-    return overlap;
 }
 
 // Display available rooms
@@ -476,17 +407,9 @@ window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) 
 
         console.log('✅ Room still available, proceeding with booking...');
 
-        // Create booking
-        await addDoc(collection(db, 'bookings'), {
-            userId: currentUser.uid,
-            roomId: roomId,
-            roomNumber: roomNumber,
-            date: date,
-            startTime: startTime,
-            endTime: endTime,
-            status: 'active',
-            createdAt: Timestamp.now()
-        });
+        // Create booking using OOP model
+        const booking = new Booking(currentUser.uid, roomId, roomNumber, date, startTime, endTime);
+        await booking.saveToDatabase();
 
         alert('Room booked successfully!');
 
@@ -548,7 +471,7 @@ async function loadMyBookings() {
     const bookingsTable = document.getElementById('bookings-table');
 
     // Show loading state
-    bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Loading bookings...</td></tr>';
+    UIUtils.showTableLoading('bookings-table', 6, 'Loading bookings...');
 
     try {
         const bookingsRef = collection(db, 'bookings');
@@ -566,7 +489,7 @@ async function loadMyBookings() {
 
         if (snapshot.empty) {
             console.log('ℹ️ No bookings found for user');
-            bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No bookings found</td></tr>';
+            UIUtils.showTableEmpty('bookings-table', 6, 'No bookings found');
             document.getElementById('booking-alert').style.display = 'none';
             return;
         }
@@ -634,7 +557,7 @@ async function loadMyBookings() {
         bookingsTable.innerHTML = '';
 
         if (activeBookings.length === 0) {
-            bookingsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No active bookings</td></tr>';
+            UIUtils.showTableEmpty('bookings-table', 6, 'No active bookings');
             document.getElementById('booking-alert').style.display = 'none';
 
             // Show booking history if available
@@ -677,15 +600,7 @@ async function loadMyBookings() {
         console.error('Error details:', error.code, error.message);
 
         // Show detailed error message
-        const bookingsTable = document.getElementById('bookings-table');
-        bookingsTable.innerHTML = `
-            <tr>
-                <td colspan="6" style="text-align: center; color: #dc3545;">
-                    Error loading bookings: ${error.message}<br>
-                    <small>Check browser console for details</small>
-                </td>
-            </tr>
-        `;
+        UIUtils.showTableError('bookings-table', 6, error);
         document.getElementById('booking-alert').style.display = 'none';
     }
 }
@@ -783,18 +698,9 @@ function showBookingHistory(allBookings) {
 
 // Calculate duration for display
 function calculateDuration(startTime, endTime) {
-    const [startHours, startMinutes] = startTime.split(':').map(Number);
-    const [endHours, endMinutes] = endTime.split(':').map(Number);
-
-    const totalMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
-
-    if (totalMinutes >= 60) {
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-        return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-    }
-
-    return `${totalMinutes}m`;
+    // Use the Booking class static method
+    const booking = new Booking('temp', 'temp', 'temp', '2025-01-01', startTime, endTime);
+    return booking.getFormattedDuration();
 }
 
 // Cancel booking
@@ -879,7 +785,7 @@ window.logout = async function () {
 document.addEventListener('DOMContentLoaded', () => {
     const dateInput = document.getElementById('booking-date');
     if (dateInput) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = DateUtils.getTodayDate();
         dateInput.min = today;
     }
 
@@ -892,17 +798,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const duration = durationSelect.value;
 
         if (startTime) {
-            const [hours, minutes] = startTime.split(':').map(Number);
-            const startMinutes = hours * 60 + minutes;
-            const endTime = calculateEndTime(startTime, duration);
-            const [endHours, endMinutes] = endTime.split(':').map(Number);
-            const endMinutesTotal = endHours * 60 + endMinutes;
-
-            const allowedStartTime = 9 * 60; // 9:00 AM
-            const allowedEndTime = 21 * 60;  // 9:00 PM
+            const endTime = TimeUtils.calculateEndTime(startTime, duration);
 
             // Visual feedback for invalid times
-            if (startMinutes < allowedStartTime || endMinutesTotal > allowedEndTime) {
+            if (!TimeUtils.validateBookingHours(startTime, endTime)) {
                 timeInput.style.borderColor = '#dc3545';
                 timeInput.style.backgroundColor = '#ffe6e6';
                 timeInput.title = `Booking must be between 9:00 AM - 9:00 PM. Your booking would end at ${endTime}.`;

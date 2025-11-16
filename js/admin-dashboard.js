@@ -1,5 +1,7 @@
 // Admin Dashboard functionality
 import { auth, db } from './firebase-config.js';
+import { User, Room, Booking } from './models.js';
+import { TimeUtils, DateUtils, UIUtils, ValidationUtils, ErrorUtils } from './utils.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
     collection,
@@ -24,30 +26,22 @@ onAuthStateChanged(auth, async (user) => {
         currentUser = user;
 
         try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            const userData = userDoc.data();
+            let userData = await User.loadFromDatabase(user.uid);
 
             if (!userData) {
                 // If user document doesn't exist, create it with default role
-                await setDoc(doc(db, 'users', user.uid), {
-                    name: user.displayName || user.email,
-                    email: user.email,
-                    role: 'student', // Default to student, admin can change later
-                    createdAt: new Date().toISOString()
-                });
+                userData = new User(user.uid, user.email, user.displayName || user.email, 'student');
+                await userData.saveToDatabase();
                 alert('This account is not set up as a librarian. Please contact an administrator.');
                 window.location.href = 'dashboardStudent.html';
                 return;
             }
 
             // Update welcome message
-            const nameElement = document.querySelector('.user-info strong');
-            if (nameElement) {
-                nameElement.textContent = userData?.name || user.email;
-            }
+            UIUtils.updateWelcomeMessage(userData, user.email);
 
             // Check if user is a librarian
-            if (userData?.role !== 'librarian') {
+            if (!userData.isLibrarian()) {
                 alert('Access denied. This page is for librarians only.');
                 window.location.href = 'dashboardStudent.html';
                 return;
@@ -95,7 +89,7 @@ async function loadRooms() {
         const roomsTable = document.getElementById('rooms-table');
 
         if (snapshot.empty) {
-            roomsTable.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #999;">No rooms found. Add your first room!</td></tr>';
+            UIUtils.showTableEmpty('rooms-table', 7, 'No rooms found. Add your first room!');
             return;
         }
 
@@ -103,26 +97,26 @@ async function loadRooms() {
         console.log(`Found ${snapshot.size} rooms`);
 
         snapshot.forEach(doc => {
-            const room = doc.data();
-            const schedule = room.schedule || {};
+            const roomData = Room.fromDatabaseData(doc.id, doc.data());
+            const schedule = roomData.schedule || {};
 
             const availableDates = schedule.startDate && schedule.endDate
                 ? `${schedule.startDate} to ${schedule.endDate}`
                 : 'Not set';
 
-            console.log(`Creating row for room ${room.number} with schedule:`, schedule);
+            console.log(`Creating row for room ${roomData.number} with schedule:`, schedule);
 
             const row = document.createElement('tr');
 
             row.innerHTML = `
-                <td>Room ${room.number}</td>
-                <td>Floor ${room.floor}</td>
-                <td>${room.capacity} people</td>
+                <td>Room ${roomData.number}</td>
+                <td>Floor ${roomData.floor}</td>
+                <td>${roomData.capacity} people</td>
                 <td><span style="font-size: 0.9em;">${availableDates}</span></td>
                 <td><span class="available-badge available">Active</span></td>
                 <td>
-                    <button class="btn-secondary" onclick="showRoomScheduleModal('${doc.id}', '${room.number}')" style="margin-right: 5px; font-size: 0.85em;">Schedule</button>
-                    <button class="btn-danger" onclick="deleteRoom('${doc.id}', '${room.number}')" style="font-size: 0.85em;">Delete</button>
+                    <button class="btn-secondary" onclick="showRoomScheduleModal('${doc.id}', '${roomData.number}')" style="margin-right: 5px; font-size: 0.85em;">Schedule</button>
+                    <button class="btn-danger" onclick="deleteRoom('${doc.id}', '${roomData.number}')" style="font-size: 0.85em;">Delete</button>
                 </td>
             `;
 
@@ -143,7 +137,7 @@ window.loadReservations = async function () {
 
         const bookingsRef = collection(db, 'bookings');
         const reservationsTable = document.getElementById('reservations-table');        // Show loading state
-        reservationsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Loading reservations...</td></tr>';
+        UIUtils.showTableLoading('reservations-table', 6, 'Loading reservations...');
 
         let snapshot;
 
@@ -174,7 +168,7 @@ window.loadReservations = async function () {
 
         if (snapshot.empty) {
             const message = filter === 'all' ? 'No reservations found' : `No ${filter} reservations found`;
-            reservationsTable.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #999;">${message}</td></tr>`;
+            UIUtils.showTableEmpty('reservations-table', 6, message);
             return;
         }
 
@@ -202,8 +196,7 @@ window.loadReservations = async function () {
         for (const booking of bookings) {
             // Get user details
             try {
-                const userDoc = await getDoc(doc(db, 'users', booking.userId));
-                const userData = userDoc.data();
+                const userData = await User.loadFromDatabase(booking.userId);
 
                 const row = document.createElement('tr');
 
@@ -282,15 +275,7 @@ window.loadReservations = async function () {
     } catch (error) {
         console.error('Error loading reservations:', error);
 
-        const reservationsTable = document.getElementById('reservations-table');
-        reservationsTable.innerHTML = `
-            <tr>
-                <td colspan="6" style="text-align: center; color: #dc3545;">
-                    Error loading reservations: ${error.message}<br>
-                    <small>Check console for details. Try refreshing the page.</small>
-                </td>
-            </tr>
-        `;
+        UIUtils.showTableError('reservations-table', 6, error);
     }
 };
 
@@ -302,7 +287,7 @@ async function loadStudents() {
         const studentsTable = document.getElementById('students-table');
 
         if (snapshot.empty) {
-            studentsTable.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No users found</td></tr>';
+            UIUtils.showTableEmpty('students-table', 5, 'No users found');
             return;
         }
 
@@ -359,7 +344,7 @@ window.showRoomScheduleModal = async function (roomId, roomNumber) {
     document.getElementById('schedule-room-name').textContent = `Room ${roomNumber}`;
 
     // Set minimum date to today for new schedules
-    const today = new Date().toISOString().split('T')[0];
+    const today = DateUtils.getTodayDate();
     document.getElementById('schedule-start-date').min = today;
     document.getElementById('schedule-end-date').min = today;
 
@@ -419,13 +404,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Add room
-                await addDoc(collection(db, 'rooms'), {
-                    number: roomNumber,
-                    floor: floor,
-                    capacity: capacity,
-                    createdAt: Timestamp.now()
-                });
+                // Add room using Room class
+                const newRoom = new Room(null, roomNumber, capacity, floor);
+                await newRoom.saveToDatabase();
 
                 alert('Room added successfully!');
                 closeAddRoomModal();
