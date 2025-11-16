@@ -46,6 +46,170 @@ The `models.js` file has been successfully integrated into the Library Room Book
   - `canUserMakeBooking()`: Checks if user can make new booking
   - `createBooking()`: Creates and validates new booking
 
+## APIE Principles Implementation
+
+This OOP implementation demonstrates all four core principles of Object-Oriented Programming:
+
+### A - Abstraction
+**Definition**: Hiding complex implementation details while exposing only essential features.
+
+**Implementation Examples**:
+- **User Authentication**: The `User.loadFromDatabase()` method abstracts the complex Firestore query operations
+  ```javascript
+  // Users don't need to know about Firestore API details
+  const user = await User.loadFromDatabase(userId);
+  // Instead of: getDoc(doc(db, 'users', userId)), error handling, data parsing, etc.
+  ```
+
+- **Booking Validation**: The `Booking.isValid()` method hides complex validation logic
+  ```javascript
+  // Simple interface for complex validation
+  if (booking.isValid()) {
+      await booking.saveToDatabase();
+  }
+  // Abstracts: time format checks, date validation, room availability, user permissions, etc.
+  ```
+
+- **Room Availability**: The `Room.isAvailableOnDate()` method abstracts schedule checking
+  ```javascript
+  // Clean interface hiding complex schedule logic
+  const available = room.isAvailableOnDate('2025-11-15');
+  // Abstracts: schedule parsing, date comparison, time slot checking, etc.
+  ```
+
+### P - Polymorphism
+**Definition**: The ability of objects to take multiple forms and respond differently to the same interface.
+
+**Implementation Examples**:
+- **Database Operations**: All models implement `saveToDatabase()` method but with different behaviors
+  ```javascript
+  // Same method name, different implementations
+  await userModel.saveToDatabase();    // Saves to 'users' collection with user-specific fields
+  await roomModel.saveToDatabase();    // Saves to 'rooms' collection with room-specific fields
+  await booking.saveToDatabase();      // Saves to 'bookings' collection with booking-specific fields
+  ```
+
+- **Role-Based Methods**: User class methods behave differently based on user type
+  ```javascript
+  // Same object, different behavior based on role
+  user.isLibrarian();  // Returns true for librarian role
+  user.isStudent();    // Returns true for student role
+  // Same interface, different results based on internal state
+  ```
+
+- **Static Factory Methods**: Different classes implement similar static creation patterns
+  ```javascript
+  // Polymorphic creation patterns
+  const user = User.fromDatabaseData(userData);
+  const room = Room.fromDatabaseData(roomData);
+  // Same pattern, different object types created
+  ```
+
+### I - Inheritance
+**Definition**: Mechanism where new classes derive properties and behaviors from existing classes.
+
+**Implementation Examples**:
+- **JavaScript Prototypal Inheritance**: All classes inherit from base Object prototype
+  ```javascript
+  // All classes inherit basic JavaScript object methods
+  user.toString();     // Inherited from Object.prototype
+  room.valueOf();      // Inherited from Object.prototype
+  booking.constructor; // Inherited constructor property
+  ```
+
+- **Class Extension Pattern**: Ready for future inheritance hierarchies
+  ```javascript
+  // Foundation for specialized user types
+  class StudentUser extends User {
+      constructor(id, email, name) {
+          super(id, email, name, 'student');
+      }
+      
+      canBookMultipleRooms() {
+          return false; // Students have restrictions
+      }
+  }
+  
+  class LibrarianUser extends User {
+      constructor(id, email, name) {
+          super(id, email, name, 'librarian');
+      }
+      
+      canBookMultipleRooms() {
+          return true; // Librarians have more privileges
+      }
+  }
+  ```
+
+- **Method Override Capability**: Classes can override inherited methods
+  ```javascript
+  // Specialized room types can override base methods
+  class ConferenceRoom extends Room {
+      getCapacityCategory() {
+          // Override base implementation for conference rooms
+          return this.capacity > 20 ? 'large-conference' : 'small-conference';
+      }
+  }
+  ```
+
+### E - Encapsulation
+**Definition**: Bundling data and methods that work on that data within a single unit, controlling access to internal state.
+
+**Implementation Examples**:
+- **Data Protection**: Class properties are encapsulated within the class scope
+  ```javascript
+  class User {
+      constructor(id, email, name, role) {
+          this.id = id;           // Controlled access through class methods
+          this.email = email;     // Internal state protection
+          this.name = name;       // Data integrity maintained
+          this.role = role;
+      }
+      
+      updateRole(newRole) {
+          // Controlled modification with validation
+          if (['student', 'librarian'].includes(newRole)) {
+              this.role = newRole;
+          }
+          // Direct property access could bypass validation
+      }
+  }
+  ```
+
+- **Method Encapsulation**: Related functionality grouped within appropriate classes
+  ```javascript
+  // Booking-related operations encapsulated in Booking class
+  class Booking {
+      isActive() { /* booking-specific logic */ }
+      isExpired() { /* booking-specific logic */ }
+      cancel() { /* booking-specific logic */ }
+      // All booking operations in one place
+  }
+  ```
+
+- **Information Hiding**: Complex internal operations hidden from external usage
+  ```javascript
+  // BookingManager hides complex coordination logic
+  class BookingManager {
+      async createBooking(roomId, roomNumber, date, startTime, endTime) {
+          // Internal validation, user checks, time overlap detection
+          // External code doesn't need to know implementation details
+          return booking;
+      }
+  }
+  ```
+
+- **State Management**: Object state changes controlled through methods
+  ```javascript
+  // Room availability controlled through proper methods
+  room.setSchedule(schedule);        // Proper way to modify schedule
+  // room.schedule = newSchedule;    // Direct access bypassed - not recommended
+  
+  // Booking status controlled through state methods
+  booking.cancel();    // Changes status to 'cancelled'
+  booking.complete();  // Changes status to 'completed'
+  ```
+
 ## Files Modified
 
 ### 1. student-dashboard.js

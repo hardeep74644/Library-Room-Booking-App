@@ -27,7 +27,7 @@ export function checkAuthState() {
                         if (userData && userData.role === 'librarian') {
                             window.location.href = 'admin-dashboard.html';
                         } else {
-                            window.location.href = 'dashboardStudent.html';
+                            window.location.href = 'student-dashboard.html';
                         }
                     }
 
@@ -39,7 +39,7 @@ export function checkAuthState() {
             } else {
                 console.log('❌ No user signed in');
                 // Only redirect to login if on protected page
-                const protectedPages = ['dashboardStudent.html', 'admin-dashboard.html'];
+                const protectedPages = ['student-dashboard.html', 'admin-dashboard.html'];
                 const currentPage = window.location.pathname.split('/').pop();
 
                 if (protectedPages.includes(currentPage)) {
@@ -164,7 +164,7 @@ if (window.location.pathname.includes('login.html')) {
                     if (role === 'librarian') {
                         window.location.href = 'admin-dashboard.html';
                     } else {
-                        window.location.href = 'dashboardStudent.html';
+                        window.location.href = 'student-dashboard.html';
                     }
                 } catch (error) {
                     console.error('Login error:', error);

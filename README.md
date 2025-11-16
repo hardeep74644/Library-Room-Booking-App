@@ -53,10 +53,31 @@ A production-ready web-based Library Room Booking System for managing study room
 
 ## Technology Stack
 
-- **Frontend**: HTML5, CSS3, JavaScript (ES6 modules)
+- **Frontend**: HTML5, CSS3, JavaScript (ES6 modules with OOP classes)
 - **Backend**: Firebase (Firestore Database, Authentication)
 - **Authentication**: Firebase Auth with email/password
 - **Database**: Cloud Firestore (NoSQL)
+- **Architecture**: Object-Oriented Programming (OOP) with ES6 classes
+- **Models**: User, Room, Booking, and BookingManager classes for data management
+
+## Architecture
+
+### Object-Oriented Design
+The application follows OOP principles with dedicated model classes:
+
+- **User Class**: Manages user authentication, roles, and database operations
+- **Room Class**: Handles room data, availability, and scheduling
+- **Booking Class**: Manages booking operations, validations, and status tracking
+- **BookingManager Class**: Coordinates operations between User, Room, and Booking classes
+
+### APIE Principles
+The codebase demonstrates all four OOP principles:
+- **Abstraction**: Complex operations hidden behind simple interfaces
+- **Polymorphism**: Same method names with different implementations across classes
+- **Inheritance**: JavaScript prototypal inheritance and extensible class hierarchies
+- **Encapsulation**: Data and methods bundled within classes with controlled access
+
+For detailed information about the OOP integration, see `MODELS_INTEGRATION.md`.
 
 ## Project Structure
 
@@ -65,19 +86,23 @@ Library-Room-Booking-App/
 ├── index.html                 # Landing page with navigation
 ├── login.html                 # Login page with navigation
 ├── register.html              # Registration page with navigation
-├── dashboardStudent.html      # Student dashboard
+├── student-dashboard.html     # Student dashboard
 ├── admin-dashboard.html       # Librarian dashboard
 ├── init-db.html              # Database initialization utility (admin use only)
+├── FIREBASE_RULES_UPDATE.md   # Firebase rules documentation
+├── MODELS_INTEGRATION.md      # OOP integration documentation
+├── SETUP.md                   # Project setup instructions
+├── firestore.rules           # Firebase security rules
+├── assets/
+│   └── images/               # Image assets
 ├── css/
 │   └── style.css             # Main stylesheet with responsive design
 ├── js/
 │   ├── firebase-config.js    # Firebase configuration
 │   ├── auth.js               # Authentication logic
+│   ├── models.js             # OOP model classes (User, Room, Booking, BookingManager)
 │   ├── student-dashboard.js  # Student dashboard functionality
 │   └── admin-dashboard.js    # Librarian dashboard functionality
-├── Documentation/
-│   ├── TROUBLESHOOTING.md    # Deployment troubleshooting guide
-│   └── BOOKING_ISSUES_DIAGNOSIS.md  # Operational support guide
 └── README.md
 ```
 
@@ -287,8 +312,9 @@ This system is production-ready with all debug functionality removed:
 
 ## Support & Documentation
 
-- **Troubleshooting**: See `TROUBLESHOOTING.md` for common issues
-- **Booking Issues**: See `BOOKING_ISSUES_DIAGNOSIS.md` for operational problems
+- **Setup Instructions**: See `SETUP.md` for detailed setup and configuration
+- **OOP Architecture**: See `MODELS_INTEGRATION.md` for object-oriented design details
+- **Firebase Rules**: See `FIREBASE_RULES_UPDATE.md` for security rules documentation
 - **Firebase Setup**: Detailed configuration instructions in setup section
 - **Security Rules**: Pre-configured Firestore security rules included
 

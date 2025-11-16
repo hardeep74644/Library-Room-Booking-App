@@ -35,7 +35,7 @@ onAuthStateChanged(auth, async (user) => {
                 await currentUserModel.saveToDatabase();
 
                 alert('This account is not set up as a librarian. Please contact an administrator.');
-                window.location.href = 'dashboardStudent.html';
+                window.location.href = 'student-dashboard.html';
                 return;
             }
 
@@ -48,7 +48,7 @@ onAuthStateChanged(auth, async (user) => {
             // Check if user is a librarian
             if (!currentUserModel.isLibrarian()) {
                 alert('Access denied. This page is for librarians only.');
-                window.location.href = 'dashboardStudent.html';
+                window.location.href = 'student-dashboard.html';
                 return;
             }
 
