@@ -226,21 +226,15 @@ class Booking {
         }
 
         // Check if end time is after start time
-        const start = this.timeToMinutes(this.startTime);
-        const end = this.timeToMinutes(this.endTime);
+        const start = TimeUtils.timeToMinutes(this.startTime);
+        const end = TimeUtils.timeToMinutes(this.endTime);
 
         return end > start;
     }
 
-    // Convert time string to minutes
-    timeToMinutes(timeString) {
-        const [hours, minutes] = timeString.split(':').map(Number);
-        return hours * 60 + minutes;
-    }
-
     // Calculate booking duration in minutes
     getDurationInMinutes() {
-        return this.timeToMinutes(this.endTime) - this.timeToMinutes(this.startTime);
+        return TimeUtils.timeToMinutes(this.endTime) - TimeUtils.timeToMinutes(this.startTime);
     }
 
     // Get formatted duration string
@@ -377,16 +371,11 @@ class Booking {
 
     // Check time overlap between two bookings
     static checkTimeOverlap(start1, end1, start2, end2) {
-        // Convert times to comparable format
-        const timeToMinutes = (timeString) => {
-            const [hours, minutes] = timeString.split(':').map(Number);
-            return hours * 60 + minutes;
-        };
-
-        const start1Minutes = timeToMinutes(start1);
-        const end1Minutes = timeToMinutes(end1);
-        const start2Minutes = timeToMinutes(start2);
-        const end2Minutes = timeToMinutes(end2);
+        // Use TimeUtils for consistent time calculations
+        const start1Minutes = TimeUtils.timeToMinutes(start1);
+        const end1Minutes = TimeUtils.timeToMinutes(end1);
+        const start2Minutes = TimeUtils.timeToMinutes(start2);
+        const end2Minutes = TimeUtils.timeToMinutes(end2);
 
         return (start1Minutes < end2Minutes && end1Minutes > start2Minutes);
     }

@@ -1,5 +1,7 @@
 // Authentication functionality
 import { auth, db } from './firebase-config.js';
+import { User } from './models.js';
+import { ErrorUtils } from './utils.js';
 import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
@@ -19,12 +21,11 @@ export function checkAuthState() {
 
                 // Get user role from Firestore
                 try {
-                    const userDoc = await getDoc(doc(db, 'users', user.uid));
-                    const userData = userDoc.data();
+                    const userData = await User.loadFromDatabase(user.uid);
 
                     // Only redirect if on login page
                     if (window.location.pathname.includes('login.html')) {
-                        if (userData && userData.role === 'librarian') {
+                        if (userData && userData.isLibrarian()) {
                             window.location.href = 'admin-dashboard.html';
                         } else {
                             window.location.href = 'dashboardStudent.html';
@@ -59,8 +60,7 @@ export async function login(email, password) {
         const user = userCredential.user;
 
         // Get user role
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const userData = userDoc.data();
+        const userData = await User.loadFromDatabase(user.uid);
 
         console.log('✅ Login successful:', user.email);
         return { user, role: userData?.role || 'student' };
@@ -106,27 +106,7 @@ export async function logout() {
     }
 }
 
-// Get error message
-export function getAuthErrorMessage(errorCode) {
-    switch (errorCode) {
-        case 'auth/invalid-email':
-            return 'Invalid email address format.';
-        case 'auth/user-not-found':
-            return 'No user found with this email.';
-        case 'auth/wrong-password':
-            return 'Incorrect password.';
-        case 'auth/invalid-credential':
-            return 'Invalid email or password.';
-        case 'auth/email-already-in-use':
-            return 'An account with this email already exists.';
-        case 'auth/weak-password':
-            return 'Password should be at least 6 characters.';
-        case 'auth/network-request-failed':
-            return 'Network error. Please check your connection.';
-        default:
-            return 'An error occurred. Please try again.';
-    }
-}
+// Error handling moved to utils.js
 
 // Initialize auth listeners
 checkAuthState();
@@ -164,7 +144,7 @@ if (window.location.pathname.includes('login.html')) {
                     }
                 } catch (error) {
                     console.error('Login error:', error);
-                    alert(getAuthErrorMessage(error.code));
+                    alert(ErrorUtils.getAuthErrorMessage(error.code));
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Login';
                 }

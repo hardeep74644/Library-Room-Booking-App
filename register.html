@@ -49,9 +49,10 @@
 
     <script type="module" src="js/firebase-config.js"></script>
     <script type="module">
-        import { auth, db } from './js/firebase-config.js';
+        import { auth } from './js/firebase-config.js';
+        import { User } from './js/models.js';
+        import { ValidationUtils, ErrorUtils } from './js/utils.js';
         import { createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-        import { doc, setDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const registerForm = document.getElementById('register-form');
 
@@ -67,6 +68,11 @@
             // Basic validation
             if (!name || !email || !password) {
                 alert('Please fill in all fields');
+                return;
+            }
+
+            if (!ValidationUtils.isValidEmail(email)) {
+                alert('Please enter a valid email address');
                 return;
             }
 
@@ -88,13 +94,9 @@
                     displayName: name
                 });
 
-                // Save user data to Firestore
-                await setDoc(doc(db, 'users', user.uid), {
-                    name: name,
-                    email: email,
-                    role: role,
-                    createdAt: new Date().toISOString()
-                });
+                // Save user data to Firestore using User class
+                const newUser = new User(user.uid, email, name, role);
+                await newUser.saveToDatabase();
 
                 alert('Registration successful! Redirecting to student dashboard...');
 
@@ -105,24 +107,7 @@
 
             } catch (error) {
                 console.error('Registration error:', error);
-                let errorMessage = 'Registration failed. Please try again.';
-
-                switch (error.code) {
-                    case 'auth/email-already-in-use':
-                        errorMessage = 'An account with this email already exists.';
-                        break;
-                    case 'auth/invalid-email':
-                        errorMessage = 'Invalid email address.';
-                        break;
-                    case 'auth/weak-password':
-                        errorMessage = 'Password should be at least 6 characters.';
-                        break;
-                    case 'auth/network-request-failed':
-                        errorMessage = 'Network error. Please check your internet connection.';
-                        break;
-                }
-
-                alert(errorMessage);
+                alert(ErrorUtils.getAuthErrorMessage(error.code));
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Register';
             }
