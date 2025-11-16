@@ -9,7 +9,8 @@ import {
     onAuthStateChanged,
     updateProfile
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-import { doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { User } from './models.js';
 
 // Check authentication state
 export function checkAuthState() {
@@ -81,7 +82,7 @@ export async function register(email, password, name) {
             displayName: name
         });
 
-        // Save user data to Firestore - all new users are students
+        // Save user data to Firestore using User model - all new users are students
         const newUser = new User(user.uid, email, name, 'student');
         await newUser.saveToDatabase();
 

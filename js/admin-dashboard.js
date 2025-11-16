@@ -17,7 +17,7 @@ import {
     orderBy,
     Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-import { User, Room, Booking, BookingManager } from './models.js';
+import { User, Room, Booking } from './models.js';
 
 let currentUser = null;
 let currentUserModel = null;
@@ -103,9 +103,8 @@ async function loadRooms() {
         roomsTable.innerHTML = '';
         console.log(`Found ${snapshot.size} rooms`);
 
-        snapshot.forEach(doc => {
-            const roomData = doc.data();
-            const room = Room.fromDatabaseData(doc.id, roomData);
+        snapshot.forEach(docSnapshot => {
+            const room = Room.fromDatabaseData(docSnapshot.id, docSnapshot.data());
             const schedule = room.schedule || {};
 
             const availableDates = schedule.startDate && schedule.endDate
@@ -202,7 +201,10 @@ window.loadReservations = async function () {
 
         reservationsTable.innerHTML = '';
 
-        for (const booking of bookings) {
+        for (const bookingData of bookings) {
+            // Convert to Booking model
+            const booking = Booking.fromDatabaseData(bookingData.id, bookingData);
+            
             // Get user details
             try {
                 const userDoc = await getDoc(doc(db, 'users', booking.userId));
@@ -417,12 +419,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Add room using Room model
-                const room = new Room(null, roomNumber, capacity, floor);
-                const success = await room.saveToDatabase();
-
-                if (!success) {
-                    throw new Error('Failed to save room to database');
-                }
+                const newRoom = new Room(null, roomNumber, capacity, floor);
+                await newRoom.saveToDatabase();
 
                 alert('Room added successfully!');
                 closeAddRoomModal();
@@ -464,20 +462,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Load room and update its schedule
+                // Load room and update schedule using Room model
                 const room = await Room.loadFromDatabase(window.currentScheduleRoomId);
                 if (!room) {
-                    throw new Error('Room not found');
+                    alert('Room not found');
+                    return;
                 }
-
-                // Set the schedule
+                
                 room.setSchedule(startDate, endDate);
-
-                // Save to database
-                const success = await room.saveToDatabase();
-                if (!success) {
-                    throw new Error('Failed to save room schedule');
-                }
+                await room.saveToDatabase();
 
                 alert('Room schedule updated successfully!');
                 closeRoomScheduleModal();

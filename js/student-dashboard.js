@@ -149,10 +149,10 @@ window.searchAvailableRooms = async function () {
         const endTime = calculateEndTime(startTime, duration);
 
         // Get all rooms with matching capacity using Room model
-        const rooms = await Room.getRoomsByCapacity(selectedCapacity);
-        const roomResults = [];
+        const allRooms = await Room.getRoomsByCapacity(selectedCapacity);
+        const rooms = [];
 
-        for (const room of rooms) {
+        for (const room of allRooms) {
             // Check if room number matches search (if provided)
             if (roomSearch && !room.number.toLowerCase().includes(roomSearch.toLowerCase())) {
                 continue;
@@ -161,7 +161,7 @@ window.searchAvailableRooms = async function () {
             // Check availability
             const isAvailable = await checkRoomAvailability(room.id, date, startTime, endTime);
 
-            roomResults.push({
+            rooms.push({
                 id: room.id,
                 number: room.number,
                 capacity: room.capacity,
@@ -191,15 +191,61 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
             return false;
         }
 
+        const schedule = room.schedule;
+
         console.log(`Checking availability for Room ${room.number}:`, {
             requestedDate: date,
             requestedTime: `${startTime} - ${endTime}`,
             schedule: room.schedule
         });
 
-        // Check if room is available on the requested date using Room model method
-        if (!room.isAvailableOnDate(date)) {
-            console.log(`Room ${room.number} not available on ${date}`);
+        if (schedule) {
+            // Check if schedule has the new date range format
+            if (!schedule.startDate || !schedule.endDate) {
+                console.log(`Room ${room.number} has old schedule format or missing date range:`, schedule);
+                return false;
+            }
+
+            // Check if the requested date is within the available date range
+            const requestedDate = new Date(date);
+            const scheduleStartDate = new Date(schedule.startDate);
+            const scheduleEndDate = new Date(schedule.endDate);
+
+            // Ensure all dates are valid
+            if (isNaN(requestedDate.getTime()) || isNaN(scheduleStartDate.getTime()) || isNaN(scheduleEndDate.getTime())) {
+                console.log(`Room ${room.number} has invalid date format:`, {
+                    requestedDate: date,
+                    scheduleStartDate: schedule.startDate,
+                    scheduleEndDate: schedule.endDate
+                });
+                return false;
+            }
+
+            console.log(`Date comparison for Room ${room.number}:`, {
+                requestedDate: requestedDate.toDateString(),
+                scheduleStartDate: scheduleStartDate.toDateString(),
+                scheduleEndDate: scheduleEndDate.toDateString(),
+                requestedDateISO: requestedDate.toISOString(),
+                scheduleStartDateISO: scheduleStartDate.toISOString(),
+                scheduleEndDateISO: scheduleEndDate.toISOString(),
+                withinRange: requestedDate >= scheduleStartDate && requestedDate <= scheduleEndDate
+            });
+
+            // Use date comparison (not time comparison)
+            const requestedDateOnly = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate());
+            const startDateOnly = new Date(scheduleStartDate.getFullYear(), scheduleStartDate.getMonth(), scheduleStartDate.getDate());
+            const endDateOnly = new Date(scheduleEndDate.getFullYear(), scheduleEndDate.getMonth(), scheduleEndDate.getDate());
+
+            if (requestedDateOnly < startDateOnly || requestedDateOnly > endDateOnly) {
+                console.log(`Room ${room.number} not available on ${date} (available from ${schedule.startDate} to ${schedule.endDate})`);
+                return false;
+            }
+
+            // Rooms are available all day within the date range - no time restrictions from schedule
+            console.log(`Room ${room.number} is within available date range - checking for booking conflicts`);
+        } else {
+            // If no schedule is set, room is not available
+            console.log(`Room ${room.number} has no schedule set - please ask librarian to set availability`);
             return false;
         }
 
@@ -238,7 +284,7 @@ async function checkRoomAvailability(roomId, date, startTime, endTime) {
 
                 console.log(`📋 Existing booking: ${bookingStart}-${bookingEnd} | Requested: ${startTime}-${endTime}`);
 
-                // Check if times overlap
+                // Check if times overlap using Booking class method
                 if (Booking.checkTimeOverlap(startTime, endTime, bookingStart, bookingEnd)) {
                     console.log(`❌ Room ${room.number} has conflicting booking: ${bookingStart}-${bookingEnd}`);
                     return false;
@@ -373,8 +419,9 @@ window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) 
 
         console.log('✅ Room still available, proceeding with booking...');
 
-        // Create booking using BookingManager
-        const booking = await bookingManager.createBooking(roomId, roomNumber, date, startTime, endTime);
+        // Create booking using Booking model
+        const newBooking = new Booking(currentUser.uid, roomId, roomNumber, date, startTime, endTime);
+        await newBooking.saveToDatabase();
 
         alert('Room booked successfully!');
 
@@ -410,9 +457,7 @@ window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) 
 // Check if user has an active booking
 async function checkUserActiveBooking() {
     try {
-        if (!currentUserModel) return false;
-
-        const activeBookings = await Booking.getUserActiveBookings(currentUserModel.uid);
+        const activeBookings = await Booking.getUserActiveBookings(currentUser.uid);
         return activeBookings.length > 0;
     } catch (error) {
         console.error('Error checking active booking:', error);
@@ -463,18 +508,17 @@ async function loadMyBookings() {
         const expiredBookingIds = [];
 
         for (const docSnapshot of snapshot.docs) {
-            const bookingData = docSnapshot.data();
-            const booking = Booking.fromDatabaseData(docSnapshot.id, bookingData);
+            const booking = Booking.fromDatabaseData(docSnapshot.id, docSnapshot.data());
 
-            // Check if active booking has expired
-            if (booking.isActive() && booking.isExpired()) {
+            // Check if active booking has expired using Booking model method
+            if (booking.isExpired()) {
                 console.log('⏰ Found expired booking:', booking);
                 expiredBookingIds.push({
                     id: booking.id,
                     bookingData: booking
                 });
 
-                // Update the booking object for immediate UI update
+                // Update the booking using model method
                 booking.complete();
             }
 
@@ -668,11 +712,16 @@ window.cancelBooking = async function (bookingId) {
         console.log('🔄 Attempting to cancel booking:', bookingId);
         console.log('👤 Current user:', currentUserModel?.uid);
 
-        // Load the booking and cancel it using the model method
+        // Load booking and cancel using Booking model
         const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
         if (!bookingDoc.exists()) {
-            throw new Error('Booking not found');
+            alert('Booking not found');
+            return;
         }
+        
+        const booking = Booking.fromDatabaseData(bookingId, bookingDoc.data());
+        booking.cancel();
+        await booking.saveToDatabase();
 
         const booking = Booking.fromDatabaseData(bookingId, bookingDoc.data());
 
