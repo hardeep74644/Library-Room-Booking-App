@@ -20,6 +20,8 @@ A production-ready web-based Library Room Booking System for managing study room
 - **Make Reservations**: Book rooms for specific time slots (30 min, 1 hr, 1.5 hr, or 2 hr)
 - **Booking Management**: View active, cancelled, and completed bookings
 - **Booking History**: Track past reservations with status updates
+- **Email Confirmations**: Automatic email notifications for booking confirmations and cancellations
+- **Email Preferences**: Customize which email notifications to receive
 - **Overlap Prevention**: System automatically prevents overlapping bookings
 - **Time Restrictions**: Booking only available between 9:00 AM - 9:00 PM
 

@@ -16,6 +16,7 @@ import {
     Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { User, Room, Booking, BookingManager } from './models.js';
+import emailService from './email-service.js';
 
 let currentUser = null;
 let currentUserModel = null;

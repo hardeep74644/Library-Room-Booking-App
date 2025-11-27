@@ -16,6 +16,7 @@ import {
     orderBy
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { User, Room, Booking, BookingManager } from './models.js';
+import emailService from './email-service.js';
 
 let currentUser = null;
 let currentUserModel = null;
@@ -435,6 +436,18 @@ window.bookRoom = async function (roomId, roomNumber, date, startTime, endTime) 
 
         alert('Room booked successfully!');
 
+        // Send booking confirmation email
+        try {
+            await emailService.sendBookingConfirmation(
+                'hardeepsingh01.apex@gmail.com',
+                currentUserModel.name,
+                booking
+            );
+            console.log('✅ Booking confirmation email sent');
+        } catch (error) {
+            console.log('⚠️ Email confirmation failed, but booking was successful:', error);
+        }
+
         // Reload bookings
         loadMyBookings();
 
@@ -635,9 +648,8 @@ function showBookingHistory(allBookings) {
         historySection.id = 'booking-history-section';
         historySection.className = 'card';
         historySection.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="margin-bottom: 20px;">
                 <h2>📚 Booking History</h2>
-                <button onclick="refreshBookingHistory()" class="btn-secondary">🔄 Refresh</button>
             </div>
             <div id="booking-history">
                 <table>
@@ -756,6 +768,19 @@ window.cancelBooking = async function (bookingId) {
             await booking.saveToDatabase();
 
             console.log('✅ Booking cancelled successfully');
+
+            // Send cancellation confirmation email
+            try {
+                await emailService.sendCancellationConfirmation(
+                    'hardeepsingh01.apex@gmail.com',
+                    currentUserModel.name,
+                    booking
+                );
+                console.log('✅ Cancellation confirmation email sent');
+            } catch (error) {
+                console.log('⚠️ Email confirmation failed, but cancellation was successful:', error);
+            }
+
             alert('Booking cancelled successfully');
             loadMyBookings();
         } else {
