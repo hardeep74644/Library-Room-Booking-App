@@ -19,9 +19,10 @@ The Firebase configuration is already set up in the project. No additional Fireb
 4. Deploy rules: `firebase deploy --only firestore:rules`
 
 ### Step 3: Initialize the Database
-1. Open `init-db.html` in your browser
-2. Click "Initialize Sample Rooms"
-3. This will create 6 sample rooms in the database
+1. Create a librarian account first (see Step 4)
+2. Log in to the admin dashboard with the librarian account
+3. Navigate to the "Rooms" tab
+4. Use the "Add Room" button to create study rooms for your library
 
 ### Step 4: Create Test Accounts
 Create at least one student and one librarian account:
@@ -124,7 +125,7 @@ This is a browser ad-blocker or privacy extension blocking Firebase CDN resource
 Make sure you're using the correct email and password. Passwords must be at least 6 characters.
 
 ### Rooms not showing up
-1. Make sure you've initialized the database using `init-db.html`
+1. Make sure you've added rooms through the admin dashboard
 2. Check browser console for any Firebase errors
 3. Ensure you're logged in with a valid account
 

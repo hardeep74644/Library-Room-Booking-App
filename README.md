@@ -131,9 +131,8 @@ This system is production-ready with all debug functionality removed:
    - Deploy Firebase Security Rules from `firestore.rules`
 
 3. **Initialize the Database** (Admin Setup)
-   - Open `init-db.html` in your browser (admin access only)
-   - Click "Initialize Sample Rooms" to add sample rooms to the database
    - Create initial librarian account manually in Firebase Console
+   - Use the admin dashboard to add rooms after logging in
 
 4. **Deploy to Web Server**
    ```bash
@@ -155,8 +154,8 @@ This system is production-ready with all debug functionality removed:
    - Suggested initial account: `admin@yourlibrary.com`
 
 2. **Initialize Sample Data:**
-   - Access `init-db.html` (restrict this file in production)
-   - Add sample rooms or create rooms through the admin dashboard
+   - Use the admin dashboard to add rooms after logging in as a librarian
+   - Click "Add Room" to create new study rooms
 
 ### For End Users
 
