@@ -96,6 +96,16 @@ header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
+/* Login Page with Books Background */
+body.login-page .login-container {
+    background: linear-gradient(rgba(102, 126, 234, 0.7), rgba(118, 75, 162, 0.7)), url('../assets/images/books.png') center/cover no-repeat;
+}
+
+/* Register Page with Floor Background */
+body.register-page .login-container {
+    background: linear-gradient(rgba(102, 126, 234, 0.7), rgba(118, 75, 162, 0.7)), url('../assets/images/floor.png') center/cover no-repeat;
+}
+
 .login-box {
     background: white;
     padding: 40px;
@@ -173,7 +183,7 @@ header {
 
 /* Hero Section */
 .hero {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(rgba(102, 126, 234, 0.7), rgba(118, 75, 162, 0.7)), url('../assets/images/floor.png') center/cover no-repeat;
     color: white;
     padding: 100px 20px;
     text-align: center;
